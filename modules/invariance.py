@@ -359,7 +359,7 @@ def render_fit_comparison(results: dict, group1, group2):
             return ""
 
         st.dataframe(
-            diff_df.style.applymap(color_inv, subset=["Invariance"]),
+            diff_df.style.map(color_inv, subset=["Invariance"]),
             use_container_width=True, hide_index=True
         )
         st.caption(
@@ -454,7 +454,7 @@ def render_invariance_interpretation(results: dict, diff_rows: list, group1, gro
         return "color:#e74c3c"
 
     st.dataframe(
-        impl_df.style.applymap(color_ach, subset=["Achieved"]),
+        impl_df.style.map(color_ach, subset=["Achieved"]),
         use_container_width=True, hide_index=True
     )
 
