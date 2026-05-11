@@ -357,7 +357,7 @@ def render_information_criteria(fit_results: dict):
         return ""
 
     st.dataframe(
-        ic_df.style.applymap(color_ev, subset=["Evidence"]),
+        ic_df.style.map(color_ev, subset=["Evidence"]),
         use_container_width=True, hide_index=True
     )
     st.caption(
