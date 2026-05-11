@@ -189,7 +189,7 @@ def render_assumption_checklist():
         if "Pass" in str(val): return "color: #2ecc71; font-weight: bold"
         return "color: #e74c3c; font-weight: bold"
 
-    styled = result_df.style.applymap(color_status, subset=["Status"])
+    styled = result_df.style.map(color_status, subset=["Status"])
     st.dataframe(styled, use_container_width=True, hide_index=True)
 
     n_fail = sum(1 for v in checks.values() if not v)
