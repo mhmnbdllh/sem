@@ -8,7 +8,7 @@ plotly
 semopy
 factor_analyzer
 pingouin
-scikit-learn
+scikit-learn==1.4.2
 openpyxl
 xlsxwriter
 reportlab
