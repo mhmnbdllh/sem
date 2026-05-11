@@ -1,0 +1,16 @@
+streamlit
+pandas
+numpy
+scipy
+matplotlib
+seaborn
+plotly
+semopy
+factor_analyzer
+pingouin
+scikit-learn
+openpyxl
+xlsxwriter
+reportlab
+networkx
+statsmodels
