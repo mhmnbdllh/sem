@@ -305,7 +305,7 @@ def render_cfa_loadings(model, constructs: dict) -> dict:
                     else: return "color:#e74c3c"
                 except: return ""
 
-            styled = loadings_df.style.applymap(color_loading, subset=["Std. Loading (λ)"])
+            styled = loadings_df.style.map(color_loading, subset=["Std. Loading (λ)"])
             st.dataframe(styled, use_container_width=True, hide_index=True)
 
             # Item-level interpretation
@@ -687,7 +687,7 @@ def render_cfa_summary(fit: dict, metrics: dict, constructs: dict):
         return "color:#e74c3c;font-weight:bold"
 
     st.dataframe(
-        result_df.style.applymap(color_status, subset=["Status"]),
+        result_df.style.map(color_status, subset=["Status"]),
         use_container_width=True, hide_index=True
     )
 
