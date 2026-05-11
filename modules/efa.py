@@ -258,7 +258,7 @@ def render_loadings(fa: FactorAnalyzer, item_names: list, n_factors: int):
             else:                                               return "color:#888"
         except: return ""
 
-    styled = loadings_df.style.applymap(color_loading)
+    styled = loadings_df.style.map(color_loading)
     st.dataframe(styled, use_container_width=True)
 
     # Variance explained
