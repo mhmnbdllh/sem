@@ -100,6 +100,13 @@ def paf_extraction(corr: np.ndarray, n_factors: int, max_iter: int = 100) -> np.
             break
         communalities = new_comm
 
+    # Always ensure output has exactly n_factors columns
+    if loadings.shape[1] < n_factors:
+        pad = np.zeros((p, n_factors - loadings.shape[1]))
+        loadings = np.hstack([loadings, pad])
+    elif loadings.shape[1] > n_factors:
+        loadings = loadings[:, :n_factors]
+
     return loadings
 
 
@@ -157,11 +164,6 @@ def run_efa(data: pd.DataFrame, n_factors: int, rotation: str) -> dict:
 
     # Extraction (PAF)
     loadings = paf_extraction(corr, n_factors)
-
-    # Pad if needed
-    if loadings.shape[1] < n_factors:
-        pad = np.zeros((p, n_factors - loadings.shape[1]))
-        loadings = np.hstack([loadings, pad])
 
     # Rotation
     if rotation == "varimax" and n_factors >= 2:
