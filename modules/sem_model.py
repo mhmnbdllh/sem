@@ -366,7 +366,7 @@ def render_structural_paths(model, structural_paths: list) -> list:
                 return "color:#e74c3c;font-weight:bold"
 
             st.dataframe(
-                hyp_df.style.applymap(color_decision, subset=["Decision"]),
+                hyp_df.style.map(color_decision, subset=["Decision"]),
                 use_container_width=True, hide_index=True
             )
 
@@ -505,7 +505,7 @@ def render_sem_checklist(fit: dict, path_results: list):
         return "color:#e74c3c;font-weight:bold"
 
     st.dataframe(
-        pd.DataFrame(rows).style.applymap(color_status, subset=["Status"]),
+        pd.DataFrame(rows).style.map(color_status, subset=["Status"]),
         use_container_width=True, hide_index=True
     )
 
