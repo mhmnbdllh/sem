@@ -105,9 +105,10 @@ def render_factor_number(data: pd.DataFrame) -> int:
     )
 
     try:
-        fa = FactorAnalyzer(n_factors=min(data.shape[1], data.shape[0]-1), rotation=None)
-        fa.fit(data)
-        ev, _ = fa.get_eigenvalues()
+        # Compute eigenvalues via numpy (avoids sklearn compatibility issues)
+        corr_matrix = data.corr().values
+        ev = np.linalg.eigvalsh(corr_matrix)[::-1]
+        ev = ev[ev > 0]  # keep positive only
 
         # Kaiser criterion
         kaiser_n = int((ev > 1).sum())
