@@ -222,7 +222,7 @@ def render_moderation_results(
         return ""
 
     st.dataframe(
-        coef_df.style.applymap(color_sig, subset=["Sig."]),
+        coef_df.style.map(color_sig, subset=["Sig."]),
         use_container_width=True, hide_index=True
     )
     st.caption("Note. Variables mean-centered prior to interaction computation (Aiken & West, 1991).")
@@ -290,7 +290,7 @@ def render_moderation_results(
 
     slope_df = pd.DataFrame(slope_rows)
     st.dataframe(
-        slope_df.style.applymap(color_sig, subset=["Sig."]),
+        slope_df.style.map(color_sig, subset=["Sig."]),
         use_container_width=True, hide_index=True
     )
 
