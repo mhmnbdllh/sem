@@ -1,2 +1,2 @@
-# sem
-Structural Equation Modelling
+# SEM (Structural Equation Modeling)
+Structural Equation Modeling for social scientists.
