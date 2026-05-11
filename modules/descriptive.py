@@ -103,8 +103,8 @@ def render_descriptive_table(df: pd.DataFrame, indicator_cols: list):
 
     styled = (
         desc_df.style
-        .applymap(color_skew, subset=["Skewness"])
-        .applymap(color_kurt, subset=["Kurtosis"])
+        .map(color_skew, subset=["Skewness"])
+        .map(color_kurt, subset=["Kurtosis"])
         .set_properties(**{"text-align": "center"})
         .set_table_styles([{
             "selector": "th",
