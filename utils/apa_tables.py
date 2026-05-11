@@ -87,7 +87,8 @@ def correlation_table(df: pd.DataFrame, vars: list = None) -> pd.DataFrame:
             if i == j:
                 corr_df.loc[c1, c2] = "—"
             elif i > j:
-                r, p = stats.pearsonr(numeric[c1].dropna(), numeric[c2].dropna())
+                combined = numeric[[c1, c2]].dropna()
+                r, p = stats.pearsonr(combined[c1], combined[c2])
                 stars = ""
                 if p < 0.001: stars = "***"
                 elif p < 0.01: stars = "**"
