@@ -159,7 +159,7 @@ def render_full_checklist():
 
         df = pd.DataFrame(rows)
         st.dataframe(
-            df.style.applymap(color_status, subset=["Status"]),
+            df.style.map(color_status, subset=["Status"]),
             use_container_width=True, hide_index=True
         )
 
