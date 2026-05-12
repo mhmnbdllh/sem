@@ -131,14 +131,13 @@ run_efa <- function(data, n_factors, rotation = "oblimin") {
     pa_95 <- apply(sim_ev, 2, quantile, 0.95)
     suggested_factors <- max(1, sum(obs_ev > pa_95))
 
-    # Factor analysis
+    # Factor analysis (scores omitted - bug in some psych versions)
     fa_result <- suppressMessages(suppressWarnings(
       psych::fa(
         data,
         nfactors = n_factors,
         rotate   = rotation,
-        fm       = "pa",
-        scores   = FALSE
+        fm       = "pa"
       )
     ))
 
