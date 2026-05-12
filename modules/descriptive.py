@@ -121,13 +121,12 @@ def render_descriptive_table(df, indicator_cols):
 
     # Item-by-item normality interpretation
     with st.expander("Item-by-Item Normality Interpretation"):
+        st.markdown("Color coding: **Green** = normal | **Orange** = mild | **Red** = problematic")
         for row in rows:
             sk = interpret_skewness(row["Skewness"], row["Variable"])
             ku = interpret_kurtosis(row["Kurtosis"], row["Variable"])
-            if sk["level"] in ("warning", "critical"):
-                badge(sk["level"], sk["message"])
-            if ku["level"] in ("warning", "critical"):
-                badge(ku["level"], ku["message"])
+            badge(sk["level"], sk["message"])
+            badge(ku["level"], ku["message"])
 
     # Distribution plots
     with st.expander("Distribution Plots"):
