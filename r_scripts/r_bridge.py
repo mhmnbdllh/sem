@@ -32,60 +32,55 @@ def check_r_available() -> dict:
 def _run_r(r_code: str) -> dict:
     """
     Execute R code and return JSON result.
-    Wraps result in tryCatch and outputs as JSON.
+    Writes JSON to a temp file to avoid stdout contamination from R messages.
     """
-    # Write R code to temp file
+    # Create temp files
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".R", delete=False, encoding="utf-8"
     ) as f:
         f.write(r_code)
         tmp_r = f.name
 
+    tmp_json = tmp_r.replace(".R", "_out.json")
+
+    # Inject JSON output file path into R code
+    r_code_with_output = r_code + f'''
+tryCatch({{
+  # Write result to JSON file
+  writeLines(
+    jsonlite::toJSON(.SEM_RESULT, auto_unbox=TRUE, na="null"),
+    "{tmp_json.replace(chr(92), "/")}"
+  )
+}}, error = function(e) {{
+  writeLines(
+    jsonlite::toJSON(list(error=conditionMessage(e)), auto_unbox=TRUE),
+    "{tmp_json.replace(chr(92), "/")}"
+  )
+}})
+'''
+
+    # Rewrite R file with output injection
+    with open(tmp_r, "w", encoding="utf-8") as f:
+        f.write(r_code_with_output)
+
     try:
         result = subprocess.run(
-            ["Rscript", tmp_r],
+            ["Rscript", "--vanilla", tmp_r],
             capture_output=True, text=True, timeout=300
         )
-        if result.returncode != 0:
-            return {"error": result.stderr[-2000:] if result.stderr else "R script failed"}
 
-        stdout = result.stdout.strip()
-        if not stdout:
-            return {"error": "R returned no output"}
+        # Read from JSON file (not stdout)
+        if os.path.exists(tmp_json):
+            with open(tmp_json, "r", encoding="utf-8") as f:
+                json_str = f.read().strip()
+            if json_str:
+                return json.loads(json_str)
 
-        # Find JSON in output - look for last complete JSON object
-        # R may print warnings/messages before the JSON
-        best_result = None
-        search_pos = len(stdout)
-        while search_pos > 0:
-            end = stdout.rfind("}", 0, search_pos)
-            if end < 0:
-                break
-            # Find matching opening brace
-            depth = 0
-            start = -1
-            for i in range(end, -1, -1):
-                if stdout[i] == "}":
-                    depth += 1
-                elif stdout[i] == "{":
-                    depth -= 1
-                    if depth == 0:
-                        start = i
-                        break
-            if start >= 0:
-                try:
-                    candidate = stdout[start:end+1]
-                    parsed = json.loads(candidate)
-                    best_result = parsed
-                    break
-                except json.JSONDecodeError:
-                    search_pos = end
-                    continue
-            else:
-                break
-        if best_result is not None:
-            return best_result
-        return {"error": f"Could not parse R output: {stdout[:500]}"}
+        # Fallback: check stderr for error message
+        if result.returncode != 0 and result.stderr:
+            return {"error": result.stderr[-1000:]}
+
+        return {"error": "R produced no output"}
 
     except subprocess.TimeoutExpired:
         return {"error": "R script timed out (>300s)"}
@@ -94,10 +89,11 @@ def _run_r(r_code: str) -> dict:
     except Exception as e:
         return {"error": str(e)}
     finally:
-        try:
-            os.unlink(tmp_r)
-        except Exception:
-            pass
+        for f in [tmp_r, tmp_json]:
+            try:
+                os.unlink(f)
+            except Exception:
+                pass
 
 
 def _df_to_r_csv(df: pd.DataFrame) -> str:
@@ -123,7 +119,7 @@ def run_descriptives(df: pd.DataFrame, indicator_cols: list) -> dict:
 source("{_escape(_R_SCRIPT_PATH)}")
 data <- read.csv("{_escape(csv_path)}")
 result <- run_descriptives(data)
-cat(jsonlite::toJSON(result, auto_unbox=TRUE, na="null"))
+.SEM_RESULT <- result
 """
     res = _run_r(r_code)
     try: os.unlink(csv_path)
@@ -138,7 +134,7 @@ def run_mardia(df: pd.DataFrame, indicator_cols: list) -> dict:
 source("{_escape(_R_SCRIPT_PATH)}")
 data <- read.csv("{_escape(csv_path)}")
 result <- run_mardia(data)
-cat(jsonlite::toJSON(result, auto_unbox=TRUE, na="null"))
+.SEM_RESULT <- result
 """
     res = _run_r(r_code)
     try: os.unlink(csv_path)
@@ -153,7 +149,7 @@ def run_harman(df: pd.DataFrame, indicator_cols: list) -> dict:
 source("{_escape(_R_SCRIPT_PATH)}")
 data <- read.csv("{_escape(csv_path)}")
 result <- run_harman(data)
-cat(jsonlite::toJSON(result, auto_unbox=TRUE, na="null"))
+.SEM_RESULT <- result
 """
     res = _run_r(r_code)
     try: os.unlink(csv_path)
@@ -169,7 +165,7 @@ def run_efa(df: pd.DataFrame, indicator_cols: list,
 source("{_escape(_R_SCRIPT_PATH)}")
 data <- read.csv("{_escape(csv_path)}")
 result <- run_efa(data, {n_factors}, "{rotation}")
-cat(jsonlite::toJSON(result, auto_unbox=TRUE, na="null"))
+.SEM_RESULT <- result
 """
     res = _run_r(r_code)
     try: os.unlink(csv_path)
@@ -188,7 +184,7 @@ source("{_escape(_R_SCRIPT_PATH)}")
 data <- read.csv("{_escape(csv_path)}")
 syntax <- "{syntax_escaped}"
 result <- run_cfa(data, syntax, "{estimator}")
-cat(jsonlite::toJSON(result, auto_unbox=TRUE, na="null"))
+.SEM_RESULT <- result
 """
     res = _run_r(r_code)
     try: os.unlink(csv_path)
@@ -206,7 +202,7 @@ source("{_escape(_R_SCRIPT_PATH)}")
 data <- read.csv("{_escape(csv_path)}")
 syntax <- "{syntax_escaped}"
 result <- run_sem(data, syntax, "{estimator}")
-cat(jsonlite::toJSON(result, auto_unbox=TRUE, na="null"))
+.SEM_RESULT <- result
 """
     res = _run_r(r_code)
     try: os.unlink(csv_path)
@@ -234,7 +230,7 @@ data <- read.csv("{_escape(csv_path)}")
 constructs <- {construct_r}
 result <- run_mediation(data, "{x_var}", "{m_var}", "{y_var}",
                         constructs, {n_boot}, "{estimator}")
-cat(jsonlite::toJSON(result, auto_unbox=TRUE, na="null"))
+.SEM_RESULT <- result
 """
     res = _run_r(r_code)
     try: os.unlink(csv_path)
@@ -258,7 +254,7 @@ source("{_escape(_R_SCRIPT_PATH)}")
 data <- read.csv("{_escape(csv_path)}")
 constructs <- {construct_r}
 result <- run_moderation(data, "{x_var}", "{w_var}", "{y_var}", constructs)
-cat(jsonlite::toJSON(result, auto_unbox=TRUE, na="null"))
+.SEM_RESULT <- result
 """
     res = _run_r(r_code)
     try: os.unlink(csv_path)
@@ -278,7 +274,7 @@ source("{_escape(_R_SCRIPT_PATH)}")
 data <- read.csv("{_escape(csv_path)}")
 syntax <- "{syntax_escaped}"
 result <- run_invariance(data, syntax, "{group_var}", "{estimator}")
-cat(jsonlite::toJSON(result, auto_unbox=TRUE, na="null"))
+.SEM_RESULT <- result
 """
     res = _run_r(r_code)
     try: os.unlink(csv_path)
@@ -302,7 +298,7 @@ source("{_escape(_R_SCRIPT_PATH)}")
 data <- read.csv("{_escape(csv_path)}")
 models <- {models_r}
 result <- run_model_comparison(data, models, "{estimator}")
-cat(jsonlite::toJSON(result, auto_unbox=TRUE, na="null"))
+.SEM_RESULT <- result
 """
     res = _run_r(r_code)
     try: os.unlink(csv_path)
