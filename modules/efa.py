@@ -74,10 +74,17 @@ def compute_bartlett(data: pd.DataFrame):
 
 
 def paf_extraction(corr: np.ndarray, n_factors: int, max_iter: int = 100) -> np.ndarray:
-    """Principal Axis Factoring (PAF) extraction."""
+    """Principal Axis Factoring (PAF) extraction. Always returns exactly n_factors columns."""
     p = corr.shape[0]
-    communalities = 1 - 1 / np.diag(np.linalg.inv(corr + 1e-6 * np.eye(p)))
+    n_factors = min(n_factors, p - 1)  # safety cap
+
+    try:
+        communalities = 1 - 1 / np.diag(np.linalg.inv(corr + 1e-6 * np.eye(p)))
+    except Exception:
+        communalities = np.full(p, 0.5)
     communalities = np.clip(communalities, 0.1, 0.99)
+
+    loadings = np.zeros((p, n_factors))  # default fallback
 
     for _ in range(max_iter):
         R = corr.copy()
@@ -87,25 +94,33 @@ def paf_extraction(corr: np.ndarray, n_factors: int, max_iter: int = 100) -> np.
         eigenvalues = eigenvalues[idx]
         eigenvectors = eigenvectors[:, idx]
 
-        pos = eigenvalues > 0
-        ev_pos = eigenvalues[pos]
-        vec_pos = eigenvectors[:, pos]
+        # Take only positive eigenvalues, cap at n_factors
+        n_pos = int((eigenvalues > 0).sum())
+        n_use = min(n_factors, n_pos)
+        if n_use == 0:
+            break
 
-        n_use = min(n_factors, pos.sum())
-        loadings = vec_pos[:, :n_use] * np.sqrt(ev_pos[:n_use])
+        ev_use  = eigenvalues[:n_use]
+        vec_use = eigenvectors[:, :n_use]
+        L       = vec_use * np.sqrt(np.abs(ev_use))
 
-        new_comm = np.sum(loadings ** 2, axis=1)
-        new_comm = np.clip(new_comm, 0.1, 0.99)
+        # Pad to exactly n_factors columns
+        if L.shape[1] < n_factors:
+            pad = np.zeros((p, n_factors - L.shape[1]))
+            L = np.hstack([L, pad])
+        loadings = L
+
+        new_comm = np.clip(np.sum(loadings ** 2, axis=1), 0.1, 0.99)
         if np.max(np.abs(new_comm - communalities)) < 1e-6:
             break
         communalities = new_comm
 
-    # Always ensure output has exactly n_factors columns
-    if loadings.shape[1] < n_factors:
-        pad = np.zeros((p, n_factors - loadings.shape[1]))
-        loadings = np.hstack([loadings, pad])
-    elif loadings.shape[1] > n_factors:
-        loadings = loadings[:, :n_factors]
+    # Final guarantee: exactly n_factors columns
+    if loadings.shape[1] != n_factors:
+        new_L = np.zeros((p, n_factors))
+        cols  = min(loadings.shape[1], n_factors)
+        new_L[:, :cols] = loadings[:, :cols]
+        loadings = new_L
 
     return loadings
 
@@ -332,10 +347,10 @@ def render_factor_extraction(data: pd.DataFrame, n_factors: int):
         with st.spinner("Running EFA..."):
             try:
                 result = run_efa(data, n_factors, rotation)
-                st.session_state["efa_result"]    = result
-                st.session_state["efa_n_factors"] = n_factors
-                st.session_state["efa_rotation"]  = rotation
-                st.session_state["efa_data_cols"] = list(data.columns)
+                st.session_state["efa_result"]      = result
+                st.session_state["efa_n_factors_val"] = n_factors
+                st.session_state["efa_rotation"]      = rotation
+                st.session_state["efa_data_cols"]     = list(data.columns)
                 st.success(f"✅ EFA complete: {n_factors} factor(s), PAF, {rotation} rotation.")
             except Exception as e:
                 st.error(f"❌ EFA failed: {str(e)}")
