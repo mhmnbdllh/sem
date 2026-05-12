@@ -196,7 +196,7 @@ def render_sidebar():
         <div style="text-align:center;padding:18px 0 10px">
             <div style="font-size:2.8rem">🧠</div>
             <div style="font-size:1.4rem;font-weight:800;
-                        color:#2E86AB;letter-spacing:1px">SEM Studio</div>
+                        color:#2E86AB;letter-spacing:1px">SEM Studio by Muhaimin Abdullah</div>
             <div style="font-size:0.70rem;color:#555;margin-top:3px">
                 Level 100 · Full SEM Suite
             </div>
