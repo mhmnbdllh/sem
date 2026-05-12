@@ -6,6 +6,5 @@ matplotlib
 seaborn
 plotly
 rpy2
-pyreadr
 openpyxl
 reportlab
