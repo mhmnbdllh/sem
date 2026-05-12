@@ -53,12 +53,38 @@ def _run_r(r_code: str) -> dict:
         if not stdout:
             return {"error": "R returned no output"}
 
-        # Find JSON in output
-        start = stdout.rfind("{")
-        end   = stdout.rfind("}") + 1
-        if start >= 0 and end > start:
-            json_str = stdout[start:end]
-            return json.loads(json_str)
+        # Find JSON in output - look for last complete JSON object
+        # R may print warnings/messages before the JSON
+        best_result = None
+        search_pos = len(stdout)
+        while search_pos > 0:
+            end = stdout.rfind("}", 0, search_pos)
+            if end < 0:
+                break
+            # Find matching opening brace
+            depth = 0
+            start = -1
+            for i in range(end, -1, -1):
+                if stdout[i] == "}":
+                    depth += 1
+                elif stdout[i] == "{":
+                    depth -= 1
+                    if depth == 0:
+                        start = i
+                        break
+            if start >= 0:
+                try:
+                    candidate = stdout[start:end+1]
+                    parsed = json.loads(candidate)
+                    best_result = parsed
+                    break
+                except json.JSONDecodeError:
+                    search_pos = end
+                    continue
+            else:
+                break
+        if best_result is not None:
+            return best_result
         return {"error": f"Could not parse R output: {stdout[:500]}"}
 
     except subprocess.TimeoutExpired:
