@@ -169,10 +169,14 @@ def render_loadings_table(result, item_names, n_factors):
     elif isinstance(loadings_raw, dict):
         loadings_mat = pd.DataFrame(loadings_raw)
     elif isinstance(loadings_raw, list):
+        if len(loadings_raw) > 0 and isinstance(loadings_raw[0], list):
+            actual_cols = len(loadings_raw[0])
+        else:
+            actual_cols = n_factors
         loadings_mat = pd.DataFrame(
-            loadings_raw,
+            np.array(loadings_raw),
             index=item_names[:len(loadings_raw)],
-            columns=[f"F{i+1}" for i in range(n_factors)]
+            columns=[f"F{i+1}" for i in range(actual_cols)]
         )
     else:
         st.warning("Could not parse loadings.")
