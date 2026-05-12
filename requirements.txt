@@ -5,10 +5,7 @@ scipy
 matplotlib
 seaborn
 plotly
-semopy
-pingouin
+rpy2
+pyreadr
 openpyxl
-xlsxwriter
 reportlab
-networkx
-statsmodels
