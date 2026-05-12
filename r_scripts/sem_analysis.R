@@ -116,12 +116,20 @@ run_efa <- function(data, n_factors, rotation = "oblimin") {
     kmo_result <- suppressMessages(suppressWarnings(psych::KMO(data)))
     bart       <- suppressMessages(suppressWarnings(psych::cortest.bartlett(data)))
 
-    # Parallel analysis for factor number
-    pa <- suppressMessages(suppressWarnings(
-      psych::fa.parallel(data, fa = "fa", plot = FALSE,
-                         n.iter = 100, sim = TRUE)
-    ))
-    suggested_factors <- max(1, pa$nfact)
+    # Parallel analysis via eigenvalue simulation (no console output)
+    n_obs   <- nrow(data)
+    n_items <- ncol(data)
+    obs_ev  <- eigen(cor(data))$values
+
+    # Simulate random eigenvalues (100 iterations)
+    set.seed(42)
+    sim_ev <- matrix(0, nrow=100, ncol=n_items)
+    for (i in 1:100) {
+      rand_data <- matrix(rnorm(n_obs * n_items), nrow=n_obs, ncol=n_items)
+      sim_ev[i,] <- eigen(cor(rand_data))$values
+    }
+    pa_95 <- apply(sim_ev, 2, quantile, 0.95)
+    suggested_factors <- max(1, sum(obs_ev > pa_95))
 
     # Factor analysis
     fa_result <- suppressMessages(suppressWarnings(
