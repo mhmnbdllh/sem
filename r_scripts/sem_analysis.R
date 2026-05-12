@@ -74,7 +74,7 @@ run_mardia <- function(data) {
   }
 
   tryCatch({
-    result <- psych::mardia(data, plot = FALSE)
+    result <- suppressMessages(suppressWarnings(psych::mardia(data, plot = FALSE)))
 
     sk_p <- result$p.skew
     ku_p <- result$p.kurt
@@ -113,22 +113,26 @@ run_efa <- function(data, n_factors, rotation = "oblimin") {
 
   tryCatch({
     # KMO & Bartlett
-    kmo_result <- psych::KMO(data)
-    bart       <- psych::cortest.bartlett(data)
+    kmo_result <- suppressMessages(suppressWarnings(psych::KMO(data)))
+    bart       <- suppressMessages(suppressWarnings(psych::cortest.bartlett(data)))
 
     # Parallel analysis for factor number
-    pa <- psych::fa.parallel(data, fa = "fa", plot = FALSE,
-                              n.iter = 100, sim = TRUE)
+    pa <- suppressMessages(suppressWarnings(
+      psych::fa.parallel(data, fa = "fa", plot = FALSE,
+                         n.iter = 100, sim = TRUE)
+    ))
     suggested_factors <- max(1, pa$nfact)
 
     # Factor analysis
-    fa_result <- psych::fa(
-      data,
-      nfactors = n_factors,
-      rotate   = rotation,
-      fm       = "pa",       # Principal Axis Factoring
-      scores   = FALSE
-    )
+    fa_result <- suppressMessages(suppressWarnings(
+      psych::fa(
+        data,
+        nfactors = n_factors,
+        rotate   = rotation,
+        fm       = "pa",
+        scores   = FALSE
+      )
+    ))
 
     # Extract loadings matrix
     loadings_mat <- unclass(fa_result$loadings)
@@ -553,7 +557,9 @@ run_harman <- function(data) {
   data <- data[complete.cases(data), ]
 
   tryCatch({
-    fa_1 <- psych::fa(data, nfactors = 1, rotate = "none", fm = "pa")
+    fa_1 <- suppressMessages(suppressWarnings(
+      psych::fa(data, nfactors = 1, rotate = "none", fm = "pa")
+    ))
     var   <- fa_1$Vaccounted
     prop  <- var["Proportion Var", 1]
 
