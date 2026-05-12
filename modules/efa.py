@@ -308,7 +308,7 @@ def render_factor_number(data: pd.DataFrame) -> int:
         n_factors = st.number_input(
             "Number of factors to extract:",
             min_value=1, max_value=min(n_items - 1, 10),
-            value=pa_n, step=1, key="efa_n_factors"
+            value=pa_n, step=1, key="efa_n_factors_widget"
         )
         return int(n_factors)
 
@@ -332,7 +332,7 @@ def render_factor_extraction(data: pd.DataFrame, n_factors: int):
                 "varimax": "Varimax (orthogonal)",
                 "none":    "No rotation",
             }[x],
-            key="efa_rotation"
+            key="efa_rotation_widget"
         )
     with col2:
         st.markdown("**Extraction:** Principal Axis Factoring (PAF)")
