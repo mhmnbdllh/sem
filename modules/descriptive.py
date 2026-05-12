@@ -1,519 +1,586 @@
-"""
-descriptive.py - Descriptive Statistics & Assumption Testing Module.
-Uses R/psych via r_bridge for Mardia's test and Harman's test.
-"""
-import streamlit as st
-import pandas as pd
-import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
-from scipy import stats as scipy_stats
+# sem_analysis.R
+# ============================================================
+# SEM Studio — Core R Analysis Script
+# All SEM/CFA/EFA computations using lavaan & psych
+#
+# Libraries: lavaan, semTools, psych, GPArotation
+# Called from Python via rpy2
+#
+# References:
+#   Rosseel (2012). lavaan: An R Package for SEM. JSS.
+#   Hair et al. (2019). Multivariate Data Analysis (8th ed.)
+#   Kline (2016). Principles and Practice of SEM (4th ed.)
+#   Hu & Bentler (1999). Cutoff criteria for fit indexes.
+#   Fornell & Larcker (1981). Evaluating SEM models.
+# ============================================================
 
-from utils.interpretation import (
-    interpret_sample_size, interpret_missing,
-    interpret_skewness, interpret_kurtosis,
-    interpret_mardia, interpret_kmo, interpret_bartlett
-)
+suppressPackageStartupMessages({
+  library(lavaan)
+  library(semTools)
+  library(psych)
+  library(GPArotation)
+  library(jsonlite)
+})
 
-COLORS = {
-    "excellent": "#1a7a4a",
-    "good":      "#2ecc71",
-    "ok":        "#1a6fa8",
-    "warning":   "#b7770d",
-    "critical":  "#c0392b",
+
+# ── UTILITY: Data prep ───────────────────────────────────────────
+
+prepare_data <- function(data) {
+  # Convert all indicator columns to numeric
+  data[] <- lapply(data, function(x) suppressWarnings(as.numeric(as.character(x))))
+  return(data)
 }
 
-def badge(level, message):
-    color = COLORS.get(level, "#555555")
-    st.markdown(
-        f'<div style="background:{color}18;border-left:4px solid {color};'
-        f'padding:10px 14px;border-radius:4px;margin:6px 0;'
-        f'color:#1a1a1a;font-size:0.92rem">{message}</div>',
-        unsafe_allow_html=True,
+
+# ── 1. DESCRIPTIVE STATISTICS ────────────────────────────────────
+
+run_descriptives <- function(data) {
+  data <- prepare_data(data)
+
+  results <- list()
+  for (col in colnames(data)) {
+    x <- data[[col]]
+    x <- x[!is.na(x)]
+    if (length(x) < 3) next
+
+    results[[col]] <- list(
+      n        = length(x),
+      mean     = round(mean(x), 3),
+      sd       = round(sd(x), 3),
+      min      = round(min(x), 3),
+      max      = round(max(x), 3),
+      skewness = round(psych::skew(x), 3),
+      kurtosis = round(psych::kurtosi(x), 3),
+      missing  = sum(is.na(data[[col]]))
+    )
+  }
+  return(results)
+}
+
+
+# ── 2. MULTIVARIATE NORMALITY (Mardia's Test) ────────────────────
+
+run_mardia <- function(data) {
+  data <- prepare_data(data)
+  data <- data[complete.cases(data), ]
+
+  if (nrow(data) < 10 || ncol(data) < 2) {
+    return(list(
+      skewness   = NA, skewness_p = NA,
+      kurtosis   = NA, kurtosis_p = NA,
+      estimator  = "ML",
+      normal     = FALSE
+    ))
+  }
+
+  tryCatch({
+    result <- suppressMessages(suppressWarnings(psych::mardia(data, plot = FALSE)))
+
+    sk_p <- result$p.skew
+    ku_p <- result$p.kurt
+
+    normal    <- (sk_p > 0.05) && (ku_p > 0.05)
+    estimator <- if (normal) "ML" else "MLR"
+
+    return(list(
+      skewness   = round(result$b1p, 4),
+      skewness_p = round(sk_p, 4),
+      kurtosis   = round(result$b2p, 4),
+      kurtosis_p = round(ku_p, 4),
+      estimator  = estimator,
+      normal     = normal
+    ))
+  }, error = function(e) {
+    return(list(
+      skewness = NA, skewness_p = NA,
+      kurtosis = NA, kurtosis_p = NA,
+      estimator = "MLR", normal = FALSE,
+      error = conditionMessage(e)
+    ))
+  })
+}
+
+
+# ── 3. EXPLORATORY FACTOR ANALYSIS ───────────────────────────────
+
+run_efa <- function(data, n_factors, rotation = "oblimin") {
+  data <- prepare_data(data)
+  data <- data[complete.cases(data), ]
+
+  if (nrow(data) < 10) {
+    return(list(error = "Not enough complete cases for EFA."))
+  }
+
+  tryCatch({
+    # KMO & Bartlett
+    kmo_result <- suppressMessages(suppressWarnings(psych::KMO(data)))
+    bart       <- suppressMessages(suppressWarnings(psych::cortest.bartlett(data)))
+
+    # Parallel analysis via eigenvalue simulation (no console output)
+    n_obs   <- nrow(data)
+    n_items <- ncol(data)
+    obs_ev  <- eigen(cor(data))$values
+
+    # Simulate random eigenvalues (100 iterations)
+    set.seed(42)
+    sim_ev <- matrix(0, nrow=100, ncol=n_items)
+    for (i in 1:100) {
+      rand_data <- matrix(rnorm(n_obs * n_items), nrow=n_obs, ncol=n_items)
+      sim_ev[i,] <- eigen(cor(rand_data))$values
+    }
+    pa_95 <- apply(sim_ev, 2, quantile, 0.95)
+    suggested_factors <- max(1, sum(obs_ev > pa_95))
+
+    # Factor analysis
+    fa_result <- suppressMessages(suppressWarnings(
+      psych::fa(
+        data,
+        nfactors = n_factors,
+        rotate   = rotation,
+        fm       = "pa",
+        scores   = FALSE
+      )
+    ))
+
+    # Extract loadings matrix
+    loadings_mat <- unclass(fa_result$loadings)
+
+    # Variance explained
+    var_explained <- fa_result$Vaccounted
+
+    # Communalities
+    communalities <- fa_result$communality
+
+    return(list(
+      kmo              = round(kmo_result$MSA, 3),
+      kmo_per_item     = round(kmo_result$MSAi, 3),
+      bartlett_chi2    = round(bart$chisq, 3),
+      bartlett_df      = bart$df,
+      bartlett_p       = round(bart$p.value, 4),
+      suggested_factors= suggested_factors,
+      loadings         = round(loadings_mat, 3),
+      communalities    = round(communalities, 3),
+      var_explained    = round(var_explained, 3),
+      n_factors        = n_factors,
+      rotation         = rotation,
+      n                = nrow(data)
+    ))
+
+  }, error = function(e) {
+    return(list(error = conditionMessage(e)))
+  })
+}
+
+
+# ── 4. CONFIRMATORY FACTOR ANALYSIS ──────────────────────────────
+
+run_cfa <- function(data, model_syntax, estimator = "MLR") {
+  data <- prepare_data(data)
+  data <- data[complete.cases(data), ]
+
+  if (nrow(data) < 50) {
+    return(list(error = "Not enough complete cases for CFA (minimum 50)."))
+  }
+
+  tryCatch({
+    fit <- lavaan::cfa(
+      model     = model_syntax,
+      data      = data,
+      estimator = estimator,
+      std.lv    = TRUE
     )
 
+    # Fit indices
+    fit_indices <- lavaan::fitMeasures(fit, c(
+      "chisq", "df", "pvalue",
+      "rmsea", "rmsea.ci.lower", "rmsea.ci.upper",
+      "cfi", "tli", "nfi", "ifi",
+      "srmr", "gfi", "agfi",
+      "aic", "bic",
+      "chisq.scaled", "df.scaled", "pvalue.scaled",
+      "rmsea.scaled", "cfi.scaled", "tli.scaled"
+    ))
 
-def render_overview(df, validation):
-    st.subheader("Dataset Overview")
-    n_rows, n_cols = df.shape
-    numeric_cols   = df.select_dtypes(include=[np.number]).columns.tolist()
-    missing_total  = df.isnull().sum().sum()
-    missing_pct    = missing_total / (n_rows * n_cols)
+    # Parameter estimates
+    params <- lavaan::parameterEstimates(fit, standardized = TRUE)
 
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Respondents (n)", f"{n_rows:,}")
-    c2.metric("Total Variables", n_cols)
-    c3.metric("Numeric Variables", len(numeric_cols))
-    c4.metric("Total Missing", f"{missing_total:,}")
-    c5.metric("Missing %", f"{missing_pct:.1%}")
+    # Factor loadings (standardized)
+    loadings <- params[params$op == "=~", c("lhs", "rhs", "est", "se", "z", "pvalue", "std.all")]
+    colnames(loadings) <- c("construct", "item", "unstd", "se", "z", "p", "std")
+    loadings <- loadings[order(loadings$construct), ]
 
-    result = interpret_sample_size(n_rows)
-    badge(result["level"], result["message"])
+    # Reliability & Validity via semTools
+    rel <- tryCatch({
+      semTools::reliability(fit)
+    }, error = function(e) NULL)
+
+    # AVE
+    ave <- tryCatch({
+      semTools::AVE(fit)
+    }, error = function(e) NULL)
+
+    # HTMT
+    htmt <- tryCatch({
+      semTools::htmt(model_syntax, data = data)
+    }, error = function(e) NULL)
+
+    # Modification indices
+    mi <- tryCatch({
+      lavaan::modindices(fit, sort. = TRUE, maximum.number = 10)
+    }, error = function(e) NULL)
+
+    return(list(
+      fit_indices  = round(fit_indices, 4),
+      loadings     = loadings,
+      reliability  = rel,
+      ave          = ave,
+      htmt         = htmt,
+      mod_indices  = mi,
+      n            = nrow(data),
+      estimator    = estimator,
+      converged    = lavaan::lavInspect(fit, "converged")
+    ))
+
+  }, error = function(e) {
+    return(list(error = conditionMessage(e)))
+  })
+}
 
 
-def render_descriptive_table(df, indicator_cols):
-    st.subheader("Descriptive Statistics")
-    st.markdown(
-        "Key statistics for all indicator variables. "
-        "**Skewness** and **kurtosis** assess normality for ML estimation."
+# ── 5. FULL SEM ───────────────────────────────────────────────────
+
+run_sem <- function(data, model_syntax, estimator = "MLR") {
+  data <- prepare_data(data)
+  data <- data[complete.cases(data), ]
+
+  if (nrow(data) < 100) {
+    return(list(error = "Not enough complete cases for SEM (minimum 100)."))
+  }
+
+  tryCatch({
+    fit <- lavaan::sem(
+      model     = model_syntax,
+      data      = data,
+      estimator = estimator,
+      std.lv    = TRUE
     )
 
-    rows = []
-    for col in indicator_cols:
-        x = df[col].dropna()
-        if len(x) < 3:
-            continue
-        rows.append({
-            "Variable": col,
-            "N":        int(x.count()),
-            "Mean":     round(float(x.mean()), 3),
-            "SD":       round(float(x.std()), 3),
-            "Min":      round(float(x.min()), 3),
-            "Max":      round(float(x.max()), 3),
-            "Skewness": round(float(scipy_stats.skew(x)), 3),
-            "Kurtosis": round(float(scipy_stats.kurtosis(x)), 3),
-            "Missing":  int(df[col].isna().sum()),
-        })
+    # Fit indices
+    fit_indices <- lavaan::fitMeasures(fit, c(
+      "chisq", "df", "pvalue",
+      "rmsea", "rmsea.ci.lower", "rmsea.ci.upper",
+      "cfi", "tli", "nfi", "srmr",
+      "aic", "bic",
+      "chisq.scaled", "rmsea.scaled", "cfi.scaled"
+    ))
 
-    if not rows:
-        st.warning("No valid indicator data to display.")
-        return
+    # All parameter estimates
+    params <- lavaan::parameterEstimates(fit, standardized = TRUE)
 
-    desc_df = pd.DataFrame(rows)
+    # Structural paths only
+    paths <- params[params$op == "~", c("lhs", "rhs", "est", "se", "z", "pvalue", "std.all")]
+    colnames(paths) <- c("outcome", "predictor", "unstd", "se", "z", "p", "beta")
 
-    # Color code skewness and kurtosis
-    def color_skew(val):
-        try:
-            v = float(val)
-            if abs(v) <= 1.0:  return "color:#1a7a4a;font-weight:600"
-            elif abs(v) <= 2.0: return "color:#b7770d"
-            else:               return "color:#c0392b;font-weight:600"
-        except: return ""
+    # Factor loadings
+    loadings <- params[params$op == "=~", c("lhs", "rhs", "est", "se", "z", "pvalue", "std.all")]
+    colnames(loadings) <- c("construct", "item", "unstd", "se", "z", "p", "std")
 
-    def color_kurt(val):
-        try:
-            v = float(val)
-            if abs(v) <= 3.0:  return "color:#1a7a4a;font-weight:600"
-            elif abs(v) <= 7.0: return "color:#b7770d"
-            else:               return "color:#c0392b;font-weight:600"
-        except: return ""
+    # R-squared for endogenous variables
+    r2 <- tryCatch({
+      lavaan::lavInspect(fit, "r2")
+    }, error = function(e) NULL)
 
-    styled = (
-        desc_df.style
-        .map(color_skew, subset=["Skewness"])
-        .map(color_kurt, subset=["Kurtosis"])
-        .set_properties(**{"text-align": "center", "color": "#1a1a1a"})
-        .set_table_styles([{
-            "selector": "th",
-            "props": [
-                ("background-color", "#2E86AB"),
-                ("color", "white"),
-                ("font-weight", "bold"),
-                ("text-align", "center"),
-                ("padding", "8px"),
-            ]
-        }, {
-            "selector": "tr:nth-child(even)",
-            "props": [("background-color", "#f0f4f8")]
-        }])
-    )
-    st.dataframe(styled, use_container_width=True)
+    return(list(
+      fit_indices = round(fit_indices, 4),
+      paths       = paths,
+      loadings    = loadings,
+      r2          = r2,
+      n           = nrow(data),
+      estimator   = estimator,
+      converged   = lavaan::lavInspect(fit, "converged")
+    ))
 
-    # Item-by-item normality interpretation
-    with st.expander("Item-by-Item Normality Interpretation"):
-        st.markdown("Color coding: **Green** = normal | **Orange** = mild | **Red** = problematic")
-        for row in rows:
-            sk = interpret_skewness(row["Skewness"], row["Variable"])
-            ku = interpret_kurtosis(row["Kurtosis"], row["Variable"])
-            badge(sk["level"], sk["message"])
-            badge(ku["level"], ku["message"])
-
-    # Distribution plots
-    with st.expander("Distribution Plots"):
-        cols_to_plot = indicator_cols[:12]
-        n_plot = len(cols_to_plot)
-        grid = st.columns(min(4, n_plot))
-        for i, col in enumerate(cols_to_plot):
-            with grid[i % min(4, n_plot)]:
-                fig = px.histogram(
-                    df, x=col, nbins=10,
-                    title=col,
-                    color_discrete_sequence=["#2E86AB"],
-                    template="simple_white",
-                )
-                fig.update_layout(
-                    height=220,
-                    margin=dict(l=10, r=10, t=30, b=10),
-                    showlegend=False,
-                    title_font_size=12,
-                    font_color="#1a1a1a",
-                    plot_bgcolor="#ffffff",
-                    paper_bgcolor="#ffffff",
-                )
-                st.plotly_chart(fig, use_container_width=True)
+  }, error = function(e) {
+    return(list(error = conditionMessage(e)))
+  })
+}
 
 
-def render_missing_analysis(df, indicator_cols):
-    st.subheader("Missing Value Analysis")
+# ── 6. MEDIATION ANALYSIS (Bootstrap) ────────────────────────────
 
-    missing_df = pd.DataFrame({
-        "Variable":  indicator_cols,
-        "Missing N": [int(df[c].isna().sum()) for c in indicator_cols],
-        "Missing %": [round(df[c].isna().mean() * 100, 2) for c in indicator_cols],
-    }).sort_values("Missing %", ascending=False)
+run_mediation <- function(data, x_var, m_var, y_var,
+                          constructs,
+                          n_boot = 5000, estimator = "MLR") {
+  data <- prepare_data(data)
+  data <- data[complete.cases(data), ]
 
-    total_missing = missing_df["Missing N"].sum()
+  if (nrow(data) < 100) {
+    return(list(error = "Not enough complete cases for mediation (minimum 100)."))
+  }
 
-    if total_missing == 0:
-        badge("excellent", "No missing values detected. Your dataset is complete.")
-        return
-
-    # Bar chart
-    fig = px.bar(
-        missing_df[missing_df["Missing N"] > 0],
-        x="Variable", y="Missing %",
-        color="Missing %",
-        color_continuous_scale=["#2ecc71", "#f39c12", "#e74c3c"],
-        range_color=[0, 15],
-        template="simple_white",
-        title="Missing Values by Variable (%)",
-    )
-    fig.add_hline(y=5,  line_dash="dash", line_color="#b7770d", annotation_text="5% threshold")
-    fig.add_hline(y=10, line_dash="dash", line_color="#c0392b", annotation_text="10% critical")
-    fig.update_layout(height=320, font_color="#1a1a1a", plot_bgcolor="#ffffff", paper_bgcolor="#ffffff")
-    st.plotly_chart(fig, use_container_width=True)
-
-    st.dataframe(missing_df, use_container_width=True, hide_index=True)
-
-    # Interpretations
-    with st.expander("Recommendations per Variable"):
-        for _, row in missing_df.iterrows():
-            pct = row["Missing %"] / 100
-            if pct > 0:
-                result = interpret_missing(pct, row["Variable"])
-                badge(result["level"], result["message"])
-
-    # Overall recommendation
-    total_pct = df[indicator_cols].isna().mean().mean()
-    if total_pct <= 0.05:
-        badge("ok", f"Overall missing rate: {total_pct:.1%}. Listwise deletion or FIML is acceptable.")
-    else:
-        badge("warning", f"Overall missing rate: {total_pct:.1%}. FIML or multiple imputation is recommended.")
-
-
-def render_outlier_detection(df, indicator_cols):
-    st.subheader("Outlier Detection")
-
-    tab1, tab2 = st.tabs(["Univariate (Z-score)", "Multivariate (Mahalanobis D2)"])
-
-    with tab1:
-        st.markdown("Univariate outliers: cases with |z| > 3.29 (p < .001).")
-        data = df[indicator_cols].dropna()
-        if len(data) < 5:
-            st.warning("Not enough complete cases.")
-            return
-        z_scores     = np.abs(scipy_stats.zscore(data))
-        outlier_mask = (z_scores > 3.29).any(axis=1)
-        n_uni        = int(outlier_mask.sum())
-        if n_uni == 0:
-            badge("excellent", "No univariate outliers detected.")
-        else:
-            badge("warning", f"{n_uni} respondent(s) have at least one extreme univariate score (|z| > 3.29).")
-
-    with tab2:
-        st.markdown("Multivariate outliers: Mahalanobis D2, p < .001.")
-        data = df[indicator_cols].dropna()
-        if data.shape[0] < data.shape[1] + 2:
-            st.warning("Not enough complete cases to compute Mahalanobis distance.")
-            return
-        try:
-            mean_vec = data.mean().values
-            cov_mat  = np.cov(data.values.T)
-            if np.linalg.matrix_rank(cov_mat) < cov_mat.shape[0]:
-                st.warning("Singular covariance matrix. Some items may be perfectly correlated.")
-                return
-            inv_cov = np.linalg.inv(cov_mat)
-            from scipy.spatial.distance import mahalanobis
-            d2 = np.array([mahalanobis(row, mean_vec, inv_cov)**2 for row in data.values])
-            p_vals = 1 - scipy_stats.chi2.cdf(d2, df=data.shape[1])
-            outlier_flag = p_vals < 0.001
-            n_mv = int(outlier_flag.sum())
-            n_total = len(data)
-            pct = n_mv / n_total
-
-            if n_mv == 0:
-                badge("excellent", "No multivariate outliers detected (Mahalanobis D2, p < .001).")
-            elif pct <= 0.02:
-                badge("ok", f"{n_mv} multivariate outlier(s) detected ({pct:.1%} of sample). Review individually.")
-            else:
-                badge("warning", f"{n_mv} multivariate outlier(s) detected ({pct:.1%} of sample). Robust estimation (MLR) is recommended.")
-
-            plot_df = pd.DataFrame({"Respondent": data.index, "D2": d2, "Outlier": outlier_flag})
-            chi2_crit = scipy_stats.chi2.ppf(0.999, df=data.shape[1])
-            fig = px.scatter(
-                plot_df, x="Respondent", y="D2",
-                color="Outlier",
-                color_discrete_map={True: "#c0392b", False: "#2E86AB"},
-                template="simple_white",
-                title="Mahalanobis D2 per Respondent",
-            )
-            fig.add_hline(y=chi2_crit, line_dash="dash", line_color="#c0392b",
-                         annotation_text=f"Critical value (p=.001) = {chi2_crit:.2f}")
-            fig.update_layout(height=320, font_color="#1a1a1a", plot_bgcolor="#ffffff", paper_bgcolor="#ffffff")
-            st.plotly_chart(fig, use_container_width=True)
-            st.session_state["mv_outliers"] = list(plot_df[outlier_flag]["Respondent"])
-        except Exception as e:
-            st.error(f"Error computing Mahalanobis distance: {str(e)}")
-
-
-def render_normality(df, indicator_cols):
-    st.subheader("Multivariate Normality — Mardia's Test (via R/psych)")
-    st.markdown(
-        "Mardia's test assesses multivariate normality — a key assumption for ML estimation. "
-        "Violation suggests using **MLR** (Robust ML) instead."
-    )
-
-    data = df[indicator_cols].dropna()
-    if len(data) < 50:
-        st.warning("Too few complete cases for reliable normality testing (minimum 50).")
-        return
-
-    try:
-        from r_scripts.r_bridge import run_mardia, check_r_available
-        r_check = check_r_available()
-        if not r_check["available"]:
-            badge("warning", f"R not available: {r_check['message']}. Using Python fallback.")
-            _render_normality_python(data)
-            return
-
-        with st.spinner("Running Mardia's test via R/psych..."):
-            result = run_mardia(df, indicator_cols)
-
-        if "error" in result:
-            badge("warning", f"R error: {result['error']}. Using Python fallback.")
-            _render_normality_python(data)
-            return
-
-        sk_p = result.get("skewness_p")
-        ku_p = result.get("kurtosis_p")
-
-        c1, c2 = st.columns(2)
-        c1.metric("Mardia's Skewness", f"{result.get('skewness', 'N/A'):.3f}" if result.get("skewness") else "N/A",
-                  f"p = {sk_p:.4f}" if sk_p else "N/A")
-        c2.metric("Mardia's Kurtosis (z)", f"{result.get('kurtosis', 'N/A'):.3f}" if result.get("kurtosis") else "N/A",
-                  f"p = {ku_p:.4f}" if ku_p else "N/A")
-
-        interp = interpret_mardia(sk_p, ku_p)
-        badge(interp["level"], interp["message"])
-        st.session_state["recommended_estimator"] = interp.get("estimator", "MLR")
-
-    except Exception as e:
-        badge("warning", f"Could not run Mardia's test: {str(e)}. Using Python fallback.")
-        _render_normality_python(data)
-
-
-def _render_normality_python(data):
-    """Python fallback for normality check using univariate skewness/kurtosis."""
-    st.markdown("*Univariate normality check (Python fallback):*")
-    skews = [abs(float(scipy_stats.skew(data[c].dropna()))) for c in data.columns]
-    kurts = [abs(float(scipy_stats.kurtosis(data[c].dropna()))) for c in data.columns]
-    max_skew = max(skews) if skews else 0
-    max_kurt = max(kurts) if kurts else 0
-    if max_skew <= 2.0 and max_kurt <= 7.0:
-        badge("ok", f"Max |skewness| = {max_skew:.3f}, max |kurtosis| = {max_kurt:.3f}. Data appears approximately normal. ML estimation may be appropriate.")
-        st.session_state["recommended_estimator"] = "ML"
-    else:
-        badge("warning", f"Max |skewness| = {max_skew:.3f}, max |kurtosis| = {max_kurt:.3f}. Non-normality detected. MLR estimation is recommended.")
-        st.session_state["recommended_estimator"] = "MLR"
-
-
-def render_correlation_matrix(df, indicator_cols):
-    st.subheader("Correlation Matrix")
-    st.markdown("Pearson correlations among all indicator variables. Correlations > .85 may indicate multicollinearity.")
-
-    data = df[indicator_cols].dropna()
-    corr = data.corr()
-
-    fig = px.imshow(
-        corr,
-        color_continuous_scale="RdBu_r",
-        zmin=-1, zmax=1,
-        template="simple_white",
-        title="Correlation Heatmap",
-        text_auto=".2f",
-        aspect="auto",
-    )
-    fig.update_layout(
-        height=max(350, len(indicator_cols) * 35),
-        font_color="#1a1a1a",
-        plot_bgcolor="#ffffff",
-        paper_bgcolor="#ffffff",
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-    with st.expander("Correlation Table (lower triangle)"):
-        from utils.apa_tables import correlation_table
-        apa_corr = correlation_table(df, indicator_cols)
-        st.dataframe(apa_corr, use_container_width=True)
-        st.caption("Note: * p < .05; ** p < .01; *** p < .001")
-
-    # Multicollinearity check
-    high = [(indicator_cols[i], indicator_cols[j], corr.iloc[i,j])
-            for i in range(len(indicator_cols))
-            for j in range(i+1, len(indicator_cols))
-            if abs(corr.iloc[i,j]) > 0.85]
-    if high:
-        st.warning("High correlations detected (r > .85) — potential multicollinearity:")
-        for c1, c2, r in high:
-            st.markdown(f"  - **{c1}** and **{c2}**: r = {r:.3f}")
-    else:
-        badge("excellent", "No problematic multicollinearity detected (all r <= .85).")
-
-
-def render_harman_test(df, indicator_cols):
-    st.subheader("Common Method Bias — Harman's Single Factor Test")
-    st.markdown(
-        "When all data come from a single source (self-report), common method bias (CMB) "
-        "may inflate correlations. **Criterion:** If a single factor explains > 50% of variance, "
-        "CMB is a concern."
-    )
-
-    try:
-        from r_scripts.r_bridge import run_harman, check_r_available
-        r_check = check_r_available()
-
-        if r_check["available"]:
-            with st.spinner("Running Harman's test via R/psych..."):
-                result = run_harman(df, indicator_cols)
-
-            if "error" not in result:
-                prop = result.get("single_factor_var", 0)
-                if isinstance(prop, list): prop = prop[0]
-                prop = float(prop)
-
-                c1, c2 = st.columns(2)
-                c1.metric("Variance by First Factor", f"{prop:.1%}")
-                c2.metric("Criterion", "< 50%")
-
-                if prop < 0.50:
-                    badge("ok", f"Harman's single factor explains {prop:.1%} of variance — below the 50% criterion. Common method bias is not a major concern.")
-                else:
-                    badge("warning", f"Harman's single factor explains {prop:.1%} — above 50% criterion. CMB may be present. Report as a limitation.")
-
-                evs = result.get("eigenvalues", [])
-                if evs:
-                    if isinstance(evs, (int, float)): evs = [evs]
-                    ev_df = pd.DataFrame({"Factor": range(1, len(evs)+1), "Eigenvalue": [float(e) for e in evs]})
-                    fig = px.line(ev_df, x="Factor", y="Eigenvalue", markers=True,
-                                 template="simple_white", title="Eigenvalue Scree Plot (Harman's Test)")
-                    fig.add_hline(y=1, line_dash="dash", line_color="#b7770d", annotation_text="Eigenvalue = 1")
-                    fig.update_layout(height=300, font_color="#1a1a1a", plot_bgcolor="#ffffff", paper_bgcolor="#ffffff")
-                    st.plotly_chart(fig, use_container_width=True)
-                return
-
-        # Python fallback
-        data   = df[indicator_cols].dropna()
-        corr   = data.corr().values
-        ev     = np.linalg.eigvalsh(corr)[::-1]
-        ev     = ev[ev > 0]
-        prop   = float(ev[0] / ev.sum()) if ev.sum() > 0 else 0
-
-        c1, c2 = st.columns(2)
-        c1.metric("Variance by First Factor", f"{prop:.1%}")
-        c2.metric("Criterion", "< 50%")
-
-        if prop < 0.50:
-            badge("ok", f"Harman's: {prop:.1%} variance by first factor — below 50% criterion. CMB is not a major concern.")
-        else:
-            badge("warning", f"Harman's: {prop:.1%} variance by first factor — above 50% criterion. CMB may be present.")
-
-    except Exception as e:
-        badge("warning", f"Could not run Harman's test: {str(e)}")
-
-
-def render_estimator_recommendation():
-    st.subheader("Recommended Estimator")
-    estimator = st.session_state.get("recommended_estimator", None)
-
-    info = {
-        "ML": {
-            "name":  "Maximum Likelihood (ML)",
-            "when":  "Multivariate normality is satisfied",
-            "pros":  "Most efficient; widely accepted; provides standard fit indices",
-            "cons":  "Sensitive to non-normality",
-            "color": "#1a7a4a",
-        },
-        "MLR": {
-            "name":  "Robust Maximum Likelihood (MLR)",
-            "when":  "Multivariate normality is violated",
-            "pros":  "Satorra-Bentler corrected chi-square; robust standard errors",
-            "cons":  "Slightly less efficient than ML under normality",
-            "color": "#b7770d",
-        },
+  tryCatch({
+    # Build parcel scores (mean of indicators per construct)
+    for (cname in names(constructs)) {
+      items <- constructs[[cname]]
+      items <- items[items %in% colnames(data)]
+      if (length(items) > 0) {
+        data[[cname]] <- rowMeans(data[, items, drop = FALSE], na.rm = TRUE)
+      }
     }
 
-    if estimator and estimator in info:
-        d = info[estimator]
-        st.markdown(
-            f'<div style="background:{d["color"]}15;border:2px solid {d["color"]};'
-            f'border-radius:8px;padding:16px;color:#1a1a1a">'
-            f'<h4 style="color:{d["color"]};margin:0 0 8px 0">Recommended: {d["name"]}</h4>'
-            f'<b>When to use:</b> {d["when"]}<br>'
-            f'<b>Advantages:</b> {d["pros"]}<br>'
-            f'<b>Limitations:</b> {d["cons"]}'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
-    else:
-        st.info("Run the normality test above to receive an automatic estimator recommendation.")
-
-    st.markdown("**Override estimator (optional):**")
-    override = st.selectbox(
-        "Select estimator manually if needed:",
-        options=["Auto (recommended)", "ML", "MLR"],
-        key="estimator_override"
-    )
-    if override != "Auto (recommended)":
-        st.session_state["recommended_estimator"] = override
-        badge("ok", f"Estimator manually set to **{override}**.")
-
-
-def render_descriptive():
-    st.title("Descriptive Statistics and Assumption Testing")
-    st.markdown(
-        "Complete pre-analysis examination of your data. "
-        "Every output includes automatic interpretation to guide methodological decisions."
+    # Build lavaan mediation syntax
+    med_syntax <- paste0(
+      "# a path\n",
+      m_var, " ~ a * ", x_var, "\n",
+      "# b and c' paths\n",
+      y_var, " ~ b * ", m_var, " + cp * ", x_var, "\n",
+      "# Indirect effect\n",
+      "indirect := a * b\n",
+      "# Total effect\n",
+      "total := cp + a * b\n"
     )
 
-    if not st.session_state.get("df_ready"):
-        st.warning("Please complete Data Input and Model Setup first.")
-        return
+    fit <- lavaan::sem(
+      model     = med_syntax,
+      data      = data,
+      estimator = estimator,
+      se        = "bootstrap",
+      bootstrap = n_boot
+    )
 
-    df             = st.session_state["df"]
-    assignments    = st.session_state.get("assignments", {})
-    validation     = st.session_state.get("validation", {})
-    indicator_cols = [c for c, r in assignments.items() if r == "indicator"]
+    params <- lavaan::parameterEstimates(
+      fit,
+      boot.ci.type = "bca.simple",
+      level        = 0.95,
+      standardized = TRUE
+    )
 
-    if not indicator_cols:
-        st.warning("No indicator variables assigned. Please go back to Data Input.")
-        return
+    # Extract key paths
+    get_param <- function(label) {
+      row <- params[!is.na(params$label) & params$label == label, ]
+      if (nrow(row) == 0) return(NULL)
+      list(
+        est    = round(row$est[1], 4),
+        se     = round(row$se[1], 4),
+        z      = round(row$z[1], 4),
+        p      = round(row$pvalue[1], 4),
+        ci_lo  = round(row$ci.lower[1], 4),
+        ci_hi  = round(row$ci.upper[1], 4),
+        std    = round(row$std.all[1], 4)
+      )
+    }
 
-    render_overview(df, validation)
-    st.markdown("---")
-    render_descriptive_table(df, indicator_cols)
-    st.markdown("---")
-    render_missing_analysis(df, indicator_cols)
-    st.markdown("---")
-    render_outlier_detection(df, indicator_cols)
-    st.markdown("---")
-    render_normality(df, indicator_cols)
-    st.markdown("---")
-    render_correlation_matrix(df, indicator_cols)
-    st.markdown("---")
-    render_harman_test(df, indicator_cols)
-    st.markdown("---")
-    render_estimator_recommendation()
+    return(list(
+      a_path   = get_param("a"),
+      b_path   = get_param("b"),
+      cp_path  = get_param("cp"),
+      indirect = get_param("indirect"),
+      total    = get_param("total"),
+      n        = nrow(data),
+      n_boot   = n_boot,
+      syntax   = med_syntax
+    ))
 
-    st.session_state["descriptive_complete"] = True
-    st.markdown("---")
-    badge("excellent", "Descriptive analysis complete. Proceed to EFA or CFA in the sidebar.")
+  }, error = function(e) {
+    return(list(error = conditionMessage(e)))
+  })
+}
+
+
+# ── 7. MODERATION ANALYSIS ───────────────────────────────────────
+
+run_moderation <- function(data, x_var, w_var, y_var, constructs) {
+  data <- prepare_data(data)
+
+  tryCatch({
+    # Build parcel scores
+    for (cname in names(constructs)) {
+      items <- constructs[[cname]]
+      items <- items[items %in% colnames(data)]
+      if (length(items) > 0) {
+        data[[cname]] <- rowMeans(data[, items, drop = FALSE], na.rm = TRUE)
+      }
+    }
+
+    data <- data[complete.cases(data[, c(x_var, w_var, y_var)]), ]
+
+    if (nrow(data) < 50) {
+      return(list(error = "Not enough complete cases."))
+    }
+
+    # Mean-center
+    x <- scale(data[[x_var]], scale = FALSE)[, 1]
+    w <- scale(data[[w_var]], scale = FALSE)[, 1]
+    y <- scale(data[[y_var]], scale = FALSE)[, 1]
+    xw <- x * w
+
+    # Model without interaction
+    m1 <- lm(y ~ x + w)
+    r2_1 <- summary(m1)$r.squared
+
+    # Model with interaction
+    m2 <- lm(y ~ x + w + xw)
+    s2  <- summary(m2)
+    r2_2 <- s2$r.squared
+    delta_r2 <- r2_2 - r2_1
+
+    coefs <- coef(s2)
+
+    # Simple slopes at -1 SD, mean, +1 SD of W
+    w_sd   <- sd(data[[w_var]], na.rm = TRUE)
+    slopes <- list()
+    for (level in c(-1, 0, 1)) {
+      w_val  <- level * w_sd
+      slope  <- coefs["x", "Estimate"] + coefs["xw", "Estimate"] * w_val
+      se_val <- sqrt(
+        coefs["x", "Std. Error"]^2 +
+        (w_val^2) * coefs["xw", "Std. Error"]^2
+      )
+      t_val  <- slope / se_val
+      p_val  <- 2 * pt(abs(t_val), df = nrow(data) - 4, lower.tail = FALSE)
+      label  <- if (level == -1) "Low (-1 SD)" else if (level == 0) "Mean" else "High (+1 SD)"
+      slopes[[label]] <- list(
+        slope = round(slope, 4),
+        se    = round(se_val, 4),
+        t     = round(t_val, 4),
+        p     = round(p_val, 4)
+      )
+    }
+
+    return(list(
+      b0          = round(coefs["(Intercept)", "Estimate"], 4),
+      b1          = round(coefs["x", "Estimate"], 4),
+      b1_se       = round(coefs["x", "Std. Error"], 4),
+      b1_t        = round(coefs["x", "t value"], 4),
+      b1_p        = round(coefs["x", "Pr(>|t|)"], 4),
+      b2          = round(coefs["w", "Estimate"], 4),
+      b2_se       = round(coefs["w", "Std. Error"], 4),
+      b2_t        = round(coefs["w", "t value"], 4),
+      b2_p        = round(coefs["w", "Pr(>|t|)"], 4),
+      b3          = round(coefs["xw", "Estimate"], 4),
+      b3_se       = round(coefs["xw", "Std. Error"], 4),
+      b3_t        = round(coefs["xw", "t value"], 4),
+      b3_p        = round(coefs["xw", "Pr(>|t|)"], 4),
+      r2_1        = round(r2_1, 4),
+      r2_2        = round(r2_2, 4),
+      delta_r2    = round(delta_r2, 4),
+      simple_slopes = slopes,
+      n           = nrow(data)
+    ))
+
+  }, error = function(e) {
+    return(list(error = conditionMessage(e)))
+  })
+}
+
+
+# ── 8. MEASUREMENT INVARIANCE ────────────────────────────────────
+
+run_invariance <- function(data, model_syntax, group_var, estimator = "MLR") {
+  data <- prepare_data(data)
+
+  tryCatch({
+    extract_fit <- function(fit) {
+      fi <- lavaan::fitMeasures(fit, c(
+        "chisq", "df", "pvalue", "rmsea", "cfi", "tli", "srmr", "aic", "bic"
+      ))
+      round(fi, 4)
+    }
+
+    # Configural
+    conf <- lavaan::cfa(model_syntax, data = data,
+                        group = group_var, estimator = estimator, std.lv = TRUE)
+
+    # Metric
+    metr <- lavaan::cfa(model_syntax, data = data,
+                        group = group_var, group.equal = "loadings",
+                        estimator = estimator, std.lv = TRUE)
+
+    # Scalar
+    scal <- lavaan::cfa(model_syntax, data = data,
+                        group = group_var,
+                        group.equal = c("loadings", "intercepts"),
+                        estimator = estimator, std.lv = TRUE)
+
+    # Difference tests
+    diff_metric <- lavaan::compareFit(conf, metr)
+    diff_scalar <- lavaan::compareFit(metr, scal)
+
+    return(list(
+      configural = as.list(extract_fit(conf)),
+      metric     = as.list(extract_fit(metr)),
+      scalar     = as.list(extract_fit(scal)),
+      diff_metric = summary(diff_metric),
+      diff_scalar = summary(diff_scalar)
+    ))
+
+  }, error = function(e) {
+    return(list(error = conditionMessage(e)))
+  })
+}
+
+
+# ── 9. MODEL COMPARISON ───────────────────────────────────────────
+
+run_model_comparison <- function(data, models, estimator = "MLR") {
+  data <- prepare_data(data)
+  data <- data[complete.cases(data), ]
+
+  results <- list()
+  fitted  <- list()
+
+  for (name in names(models)) {
+    tryCatch({
+      fit <- lavaan::sem(models[[name]], data = data,
+                         estimator = estimator, std.lv = TRUE)
+      fi  <- lavaan::fitMeasures(fit, c(
+        "chisq", "df", "pvalue", "rmsea", "cfi", "tli", "srmr", "aic", "bic"
+      ))
+      results[[name]] <- round(fi, 4)
+      fitted[[name]]  <- fit
+    }, error = function(e) {
+      results[[name]] <- list(error = conditionMessage(e))
+    })
+  }
+
+  # Chi-square difference test between first two models
+  diff_test <- NULL
+  if (length(fitted) >= 2) {
+    tryCatch({
+      diff_test <- lavaan::compareFit(fitted[[1]], fitted[[2]])
+    }, error = function(e) NULL)
+  }
+
+  return(list(
+    fit_results = results,
+    diff_test   = diff_test
+  ))
+}
+
+
+# ── 10. HARMAN'S SINGLE FACTOR TEST ──────────────────────────────
+
+run_harman <- function(data) {
+  data <- prepare_data(data)
+  data <- data[complete.cases(data), ]
+
+  tryCatch({
+    fa_1 <- suppressMessages(suppressWarnings(
+      psych::fa(data, nfactors = 1, rotate = "none", fm = "pa")
+    ))
+    var   <- fa_1$Vaccounted
+    prop  <- var["Proportion Var", 1]
+
+    # All eigenvalues for scree plot
+    corr_mat <- cor(data, use = "complete.obs")
+    ev       <- eigen(corr_mat)$values
+
+    return(list(
+      single_factor_var = round(prop, 4),
+      eigenvalues       = round(ev, 4),
+      cmb_concern       = prop > 0.50
+    ))
+  }, error = function(e) {
+    return(list(error = conditionMessage(e)))
+  })
+}
