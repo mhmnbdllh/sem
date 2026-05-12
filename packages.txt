@@ -1,0 +1,5 @@
+r-base
+r-cran-lavaan
+r-cran-semtools
+r-cran-psych
+r-cran-GPArotation
