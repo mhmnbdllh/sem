@@ -16,7 +16,6 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from scipy import stats
-from factor_analyzer import FactorAnalyzer
 
 
 LEVEL_COLOR = {
@@ -55,11 +54,14 @@ def render_harman_test(df: pd.DataFrame, indicator_cols: list):
         return
 
     try:
-        fa = FactorAnalyzer(n_factors=1, rotation=None)
-        fa.fit(data)
-        ev, _ = fa.get_eigenvalues()
-        var = fa.get_factor_variance()
-        single_factor_var = var[1][0]  # proportion of variance for 1 factor
+        # Pure numpy/scipy implementation — no factor_analyzer dependency
+        corr = data.corr().values
+        eigenvalues, _ = np.linalg.eigh(corr)
+        eigenvalues = eigenvalues[::-1]  # descending
+        eigenvalues = eigenvalues[eigenvalues > 0]
+
+        total_var = eigenvalues.sum()
+        single_factor_var = eigenvalues[0] / total_var if total_var > 0 else 0
 
         c1, c2 = st.columns(2)
         c1.metric("Variance Explained by First Factor", f"{single_factor_var:.1%}")
@@ -68,21 +70,25 @@ def render_harman_test(df: pd.DataFrame, indicator_cols: list):
         if single_factor_var < 0.50:
             _badge("ok",
                 f"Harman's single factor explains **{single_factor_var:.1%}** of variance "
-                f"— below the 50% criterion. ✅ Common method bias is **not a major concern** based on this test."
+                f"— below the 50% criterion. ✅ Common method bias is **not a major concern**."
             )
         else:
             _badge("warning",
                 f"Harman's single factor explains **{single_factor_var:.1%}** of variance "
                 f"— **above the 50% criterion**. ⚠️ Common method bias may be present. "
-                "Consider reporting this as a limitation and/or using a marker variable technique."
+                "Consider reporting this as a limitation."
             )
 
-        # Scree plot of eigenvalues
-        ev_df = pd.DataFrame({"Factor": range(1, len(ev)+1), "Eigenvalue": ev})
+        # Scree plot
+        ev_df = pd.DataFrame({
+            "Factor": range(1, len(eigenvalues) + 1),
+            "Eigenvalue": eigenvalues
+        })
         fig = px.line(ev_df, x="Factor", y="Eigenvalue",
                       markers=True, template="plotly_dark",
                       title="Eigenvalue Scree Plot (Harman's Test)")
-        fig.add_hline(y=1, line_dash="dash", line_color="#f39c12", annotation_text="Eigenvalue = 1")
+        fig.add_hline(y=1, line_dash="dash", line_color="#f39c12",
+                      annotation_text="Eigenvalue = 1")
         fig.update_layout(height=320)
         st.plotly_chart(fig, use_container_width=True)
 
