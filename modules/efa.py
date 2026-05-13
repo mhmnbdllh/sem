@@ -142,6 +142,11 @@ def render_factor_number(result):
         "Always combine statistical criteria with theoretical justification."
     )
 
+    # Auto-update widget to match parallel analysis suggestion
+    if st.session_state.get("efa_suggested") != suggested:
+        st.session_state["efa_suggested"]       = suggested
+        st.session_state["efa_n_factors_widget"] = suggested
+
     n_factors = st.number_input(
         "Number of factors to extract:",
         min_value=1,
