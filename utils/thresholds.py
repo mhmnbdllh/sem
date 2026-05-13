@@ -82,9 +82,9 @@ def interpret_fit(index: str, value: float) -> tuple:
         elif value <= f["chisq_df_acceptable"]: return res("acceptable","⚠️ Acceptable (≤ 5.0)")
         else:                                return res("poor",      "❌ Poor (> 5.0)")
     elif index in ("gfi", "nfi", "ifi"):
-        if value >= f["gfi_good"]:         return res("good",      "Good (>=.95)")
-        elif value >= f["gfi_acceptable"]: return res("acceptable","Acceptable (>=.90)")
-        else:                              return res("poor",       "Poor (<.90)")
+        if value >= f["gfi_good"]:         return res("good",      "✅ Good (≥ .95)")
+        elif value >= f["gfi_acceptable"]: return res("acceptable","⚠️ Acceptable (≥ .90)")
+        else:                              return res("poor",       "❌ Poor (< .90)")
     elif index in ("aic", "bic"):
         return ("Lower is better", "#1a6fa8", "info")
     return ("—", "#999999", "unknown")
