@@ -305,28 +305,65 @@ def render_loadings_table(result, item_names, n_factors):
     return loadings_mat
 
 
+def _auto_name_factors(loadings_mat, constructs):
+    """
+    Auto-assign construct names to EFA factors based on which construct's
+    items load highest (mean abs loading) on each factor.
+    """
+    factor_cols = [c for c in loadings_mat.columns if c.startswith("F")]
+    auto_names  = {}
+    used_names  = []
+    for f in factor_cols:
+        best_construct = None
+        best_score     = -1
+        for cname, items in constructs.items():
+            valid = [i for i in items if i in loadings_mat.index]
+            if not valid:
+                continue
+            score = loadings_mat.loc[valid, f].abs().mean()
+            if score > best_score:
+                best_score     = score
+                best_construct = cname
+        if best_construct and best_construct not in used_names:
+            auto_names[f] = best_construct
+            used_names.append(best_construct)
+        else:
+            auto_names[f] = f"Factor{f[1:]}"
+    return auto_names
+
+
 def render_factor_naming(loadings_mat, n_factors):
     st.subheader("Step 5: Factor Naming")
     st.markdown(
-        "Based on items loading on each factor, assign a **theoretical name**. "
-        "This bridges EFA (data-driven) and CFA (theory-driven)."
+        "Names are auto-filled based on which construct's items load highest on each factor. "
+        "You can edit if needed — but keep names consistent with Data Input to avoid errors."
     )
 
-    factor_cols  = [f"F{i+1}" for i in range(n_factors) if f"F{i+1}" in loadings_mat.columns]
-    factor_names = {}
+    factor_cols = [f"F{i+1}" for i in range(n_factors) if f"F{i+1}" in loadings_mat.columns]
 
+    # Auto-assign names from Data Input constructs
+    constructs  = st.session_state.get("constructs", {})
+    auto_names  = _auto_name_factors(loadings_mat, constructs) if constructs else {}
+
+    factor_names = {}
     for f in factor_cols:
-        top_items = loadings_mat[f].abs().nlargest(5).index.tolist()
-        c1, c2 = st.columns([1, 2])
+        default_name = auto_names.get(f, f"Factor{f[1:]}")
+        top_items    = loadings_mat[f].abs().nlargest(5).index.tolist()
+        c1, c2       = st.columns([1, 2])
         with c1:
             name = st.text_input(
                 f"Name for {f}",
-                value=f"Factor{f[1:]}",
+                value=default_name,
                 key=f"efa_fname_{f}"
             )
             factor_names[f] = name
+            if name not in constructs:
+                badge("warning",
+                    f"Name '{name}' does not match any construct defined in Data Input. "
+                    "This may cause errors in SEM."
+                )
         with c2:
-            st.markdown(f"**Top items loading on {f}:**")
+            st.markdown(f"Top items loading on {f}:")
             for item in top_items:
                 val = loadings_mat.loc[item, f]
                 st.markdown(f"  - {item}: lambda = `{val:.3f}`")
