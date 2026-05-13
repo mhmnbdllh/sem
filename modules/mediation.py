@@ -110,7 +110,7 @@ def render_mediation_setup(constructs):
 def render_mediation_results(df, constructs, x_var, m_var, y_var, n_boot, ci_level):
     st.subheader("Step 2: Mediation Analysis Results")
     st.markdown(
-        f"Bootstrap mediation via **R/lavaan** ({n_boot:,} resamples, "
+        f"Bootstrap mediation via R/lavaan ({n_boot:,} resamples, "
         f"{int(ci_level*100)}% BCa CI). "
         "Significance criterion: CI does not contain zero."
     )
@@ -152,7 +152,7 @@ def render_mediation_results(df, constructs, x_var, m_var, y_var, n_boot, ci_lev
         return
 
     # ── Path Coefficients ──────────────────────────────────────
-    st.markdown("**Path Coefficients:**")
+    st.markdown("Path Coefficients:")
     path_rows = []
     for key, label in [
         ("a_path",  f"{x_var} --> {m_var} (a path)"),
