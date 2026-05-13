@@ -229,7 +229,7 @@ run_cfa <- function(data, model_syntax, estimator = "MLR") {
     }, error = function(e) NULL)
 
     return(list(
-      fit_indices  = round(fit_indices, 4),
+      fit_indices  = as.list(round(fit_indices, 4)),
       loadings     = loadings,
       reliability  = rel,
       ave          = ave,
@@ -290,10 +290,10 @@ run_sem <- function(data, model_syntax, estimator = "MLR") {
     }, error = function(e) NULL)
 
     return(list(
-      fit_indices = round(fit_indices, 4),
+      fit_indices = as.list(round(fit_indices, 4)),
       paths       = paths,
       loadings    = loadings,
-      r2          = r2,
+      r2          = as.list(r2),
       n           = nrow(data),
       estimator   = estimator,
       converged   = lavaan::lavInspect(fit, "converged")
