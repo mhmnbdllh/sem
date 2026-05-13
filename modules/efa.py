@@ -194,9 +194,10 @@ def render_loadings_table(result, item_names, n_factors):
     if list(loadings_mat.index) != item_names[:len(loadings_mat)]:
         loadings_mat.index = item_names[:len(loadings_mat)]
 
-    # Rename columns to F1, F2, ...
-    factor_cols = [f"F{i+1}" for i in range(min(n_factors, loadings_mat.shape[1]))]
-    loadings_mat.columns = factor_cols[:loadings_mat.shape[1]]
+    # Rename columns to F1, F2, ... using ACTUAL number of columns
+    actual_n_factors = loadings_mat.shape[1]
+    factor_cols = [f"F{i+1}" for i in range(actual_n_factors)]
+    loadings_mat.columns = factor_cols
 
     # Communalities
     communalities_raw = result.get("communalities")
