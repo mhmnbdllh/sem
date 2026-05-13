@@ -360,7 +360,7 @@ run_mediation <- function(data, x_var, m_var, y_var,
     fit <- lavaan::sem(
       model     = med_syntax,
       data      = data,
-      estimator = estimator,
+      estimator = "ML",
       se        = "bootstrap",
       bootstrap = n_boot
     )
