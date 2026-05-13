@@ -254,7 +254,7 @@ def render_comparison_table(fit_results):
 def render_nested_test(fit_results):
     st.subheader("Step 4: Chi-Square Difference Test (Nested Models)")
     st.markdown(
-        "The **Δchi2 test** is used when models are **nested** "
+        "The Δchi2 test is used when models are nested "
         "(one is a restricted version of another). "
         "A significant Δchi2 (p < .05) means the constraints significantly worsen fit."
     )
@@ -300,14 +300,14 @@ def render_nested_test(fit_results):
 
     if p_value < 0.05:
         badge("warning",
-            f"Delta chi2({delta_df}) = {delta_chi2:.3f}, p = {p_value:.4f} — **significant**. "
-            f"**{m1_name}** fits significantly worse than **{m2_name}**. "
+            f"Delta chi2({delta_df}) = {delta_chi2:.3f}, p = {p_value:.4f} — significant. "
+            f"{m1_name} fits significantly worse than {m2_name}. "
             f"The additional constraints are not supported by the data."
         )
     else:
         badge("ok",
-            f"Delta chi2({delta_df}) = {delta_chi2:.3f}, p = {p_value:.4f} — **not significant**. "
-            f"**{m1_name}** fits as well as **{m2_name}** despite being more constrained. "
+            f"Delta chi2({delta_df}) = {delta_chi2:.3f}, p = {p_value:.4f} — not significant. "
+            f"{m1_name} fits as well as {m2_name} despite being more constrained. "
             "The more parsimonious model is preferred."
         )
 
@@ -352,8 +352,8 @@ def render_information_criteria(fit_results):
         )
         rows.append({
             "Model":          name,
-            "AIC":            round(aic, 2) if aic else "—",
-            "BIC":            round(bic, 2) if bic else "—",
+            "AIC":            round(aic, 2) if aic is not None else "—",
+            "BIC":            round(bic, 2) if bic is not None else "—",
             "Delta AIC":      d_aic,
             "Akaike Weight":  weight,
             "Evidence":       evidence,
