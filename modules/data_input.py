@@ -22,6 +22,9 @@ COLORS = {
 
 def badge(level, message):
     color = COLORS.get(level, "#555555")
+    import re
+    # Convert **text** to <b>text</b> for HTML rendering
+    message = re.sub(r'[*][*](.+?)[*][*]', r'<b>\1</b>', str(message))
     st.markdown(
         f'<div style="background:{color}18;border-left:4px solid {color};'
         f'padding:10px 14px;border-radius:4px;margin:6px 0;'
@@ -122,10 +125,10 @@ def render_data_upload():
         return load_file(uploaded)
     with st.expander("Expected Data Format"):
         st.markdown("""
-- Each **row** = one respondent
-- Each **column** = one questionnaire item or demographic variable
-- Items should use **Likert scale** (e.g., 1-5 or 1-7)
-- Leave missing values **blank**
+- Each row = one respondent
+- Each column = one questionnaire item or demographic variable
+- Items should use Likert scale (e.g., 1-5 or 1-7)
+- Leave missing values blank
 - Minimum: n >= 200 for SEM, n >= 100 for CFA, at least 3 items per construct
         """)
     return None
@@ -176,7 +179,7 @@ def render_variable_assignment(df):
 
 def render_construct_definition(df, assignments):
     st.subheader("Step 3: Define Latent Constructs")
-    st.markdown("Group your indicator variables into **latent constructs**. Each needs at least **3 indicators**.")
+    st.markdown("Group your indicator variables into latent constructs. Each needs at least 3 indicators.")
     indicator_cols = [c for c, r in assignments.items() if r == "indicator"]
     if len(indicator_cols) < 3:
         st.error("Not enough indicator variables. Assign at least 3 columns as Indicator.")
@@ -201,7 +204,7 @@ def render_construct_definition(df, assignments):
 
 def render_structural_paths(constructs):
     st.subheader("Step 4: Define Structural Paths (Hypotheses)")
-    st.markdown("Specify the **directional relationships** between latent constructs.")
+    st.markdown("Specify the directional relationships between latent constructs.")
     construct_names = list(constructs.keys())
     if len(construct_names) < 2:
         st.warning("You need at least 2 constructs to define structural paths.")
