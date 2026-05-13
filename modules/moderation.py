@@ -171,19 +171,19 @@ def render_moderation_results(df, constructs, x_var, w_var, y_var, low_sd, high_
         {"Term": f"{x_var} (X)",      "beta": round(b1,3)  if b1   else "—",
          "SE": round(b1_se,3) if b1_se else "—",
          "t":  round(b1_t,3)  if b1_t  else "—",
-         "p":  round(b1_p,4)  if b1_p  else "—",
-         "Sig.": "Yes" if b1_p and b1_p < 0.05 else "No"},
+         "p":  round(b1_p,4)  if b1_p is not None else "—",
+         "Sig.": "Yes" if b1_p is not None and b1_p < 0.05 else "No"},
         {"Term": f"{w_var} (W)",      "beta": round(b2,3)  if b2   else "—",
          "SE": round(b2_se,3) if b2_se else "—",
          "t":  round(b2_t,3)  if b2_t  else "—",
-         "p":  round(b2_p,4)  if b2_p  else "—",
-         "Sig.": "Yes" if b2_p and b2_p < 0.05 else "No"},
+         "p":  round(b2_p,4)  if b2_p is not None else "—",
+         "Sig.": "Yes" if b2_p is not None and b2_p < 0.05 else "No"},
         {"Term": f"{x_var} x {w_var} (interaction)",
          "beta": round(b3,3)  if b3   else "—",
          "SE":   round(b3_se,3) if b3_se else "—",
          "t":    round(b3_t,3)  if b3_t  else "—",
-         "p":    round(b3_p,4)  if b3_p  else "—",
-         "Sig.": "Yes" if b3_p and b3_p < 0.05 else "No"},
+         "p":    round(b3_p,4)  if b3_p is not None else "—",
+         "Sig.": "Yes" if b3_p is not None and b3_p < 0.05 else "No"},
     ]
     coef_df = pd.DataFrame(coef_rows)
 
@@ -249,8 +249,8 @@ def render_moderation_results(df, constructs, x_var, w_var, y_var, low_sd, high_
                 "Simple Slope (b)": round(slope, 4) if slope else "—",
                 "SE":               round(se, 4)    if se    else "—",
                 "t":                round(t_val, 3) if t_val else "—",
-                "p":                round(p_val, 4) if p_val else "—",
-                "Sig.":             "Yes" if p_val and p_val < 0.05 else "No",
+                "p":                round(p_val, 4) if p_val is not None else "—",
+                "Sig.":             "Yes" if p_val is not None and p_val < 0.05 else "No",
             })
 
         slope_df = pd.DataFrame(slope_rows)
