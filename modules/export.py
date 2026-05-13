@@ -134,7 +134,7 @@ def render_full_checklist():
     total_pass   = 0
 
     for section, section_checks in checks.items():
-        st.markdown(f"**{section}**")
+        st.markdown(f"{section}")
         rows = []
         for check, passed in section_checks.items():
             rows.append({
@@ -160,7 +160,7 @@ def render_full_checklist():
         )
 
     pct = total_pass / total_checks if total_checks > 0 else 0
-    st.markdown(f"**Overall progress: {total_pass}/{total_checks} checks complete ({pct:.0%})**")
+    st.markdown(f"Overall progress: {total_pass}/{total_checks} checks complete ({pct:.0%})")
     st.progress(pct)
 
     if pct >= 0.80:
@@ -271,7 +271,7 @@ def generate_apa_narrative():
         acceptable = (rmsea or 999) <= FIT["rmsea_acceptable"] and (cfi or 0) >= FIT["cfi_acceptable"]
         verdict = "acceptable fit" if acceptable else "marginal fit"
 
-        if chi2 and df_:
+        if chi2 is not None and df_:
             lines.append(
                 f"The measurement model demonstrated {verdict}: "
                 f"chi2({int(df_)}) = {chi2:.3f}, p = {_fmt(p_, 3)}, "
@@ -314,7 +314,7 @@ def generate_apa_narrative():
         acceptable = (rmsea or 999) <= FIT["rmsea_acceptable"] and (cfi or 0) >= FIT["cfi_acceptable"]
         verdict = "acceptable fit" if acceptable else "marginal fit"
 
-        if chi2 and df_:
+        if chi2 is not None and df_:
             lines.append(
                 f"The full structural model demonstrated {verdict}: "
                 f"chi2({int(df_)}) = {chi2:.3f}, p = {_fmt(p_, 3)}, "
@@ -522,8 +522,8 @@ def generate_excel():
                     med_rows.append({
                         "Effect":  label,
                         "Beta":    _fmt(est),
-                        "CI_Low":  _fmt(ci_lo) if ci_lo else "—",
-                        "CI_High": _fmt(ci_hi) if ci_hi else "—",
+                        "CI_Low":  _fmt(ci_lo) if ci_lo is not None else "—",
+                        "CI_High": _fmt(ci_hi) if ci_hi is not None else "—",
                         "Sig":     (
                             "Significant" if ci_lo is not None and ci_hi is not None and not (float(ci_lo) <= 0 <= float(ci_hi))
                             else "Not Significant"
