@@ -494,7 +494,13 @@ run_moderation <- function(data, x_var, w_var, y_var, constructs) {
 # ── 8. MEASUREMENT INVARIANCE ────────────────────────────────────
 
 run_invariance <- function(data, model_syntax, group_var, estimator = "MLR") {
+  # Save group variable BEFORE prepare_data converts everything to numeric
+  group_vals <- as.character(data[[group_var]])
   data <- prepare_data(data)
+  # Restore group variable as character
+  data[[group_var]] <- group_vals
+  # Remove rows with missing group variable
+  data <- data[!is.na(data[[group_var]]), ]
 
   tryCatch({
     extract_fit <- function(fit) {
@@ -519,16 +525,27 @@ run_invariance <- function(data, model_syntax, group_var, estimator = "MLR") {
                         group.equal = c("loadings", "intercepts"),
                         estimator = estimator, std.lv = TRUE)
 
-    # Difference tests
-    diff_metric <- lavaan::compareFit(conf, metr)
-    diff_scalar <- lavaan::compareFit(metr, scal)
+    # Extract fit for each model
+    fit_conf <- as.list(extract_fit(conf))
+    fit_metr <- as.list(extract_fit(metr))
+    fit_scal <- as.list(extract_fit(scal))
+
+    # Manual difference tests (avoid summary() serialization issues)
+    calc_diff <- function(fit1, fit2) {
+      list(
+        delta_chi2  = round(as.numeric(fit2[["chisq"]]) - as.numeric(fit1[["chisq"]]), 4),
+        delta_df    = round(as.numeric(fit2[["df"]])    - as.numeric(fit1[["df"]]), 0),
+        delta_cfi   = round(as.numeric(fit2[["cfi"]])   - as.numeric(fit1[["cfi"]]), 4),
+        delta_rmsea = round(as.numeric(fit2[["rmsea"]]) - as.numeric(fit1[["rmsea"]]), 4)
+      )
+    }
 
     return(list(
-      configural = as.list(extract_fit(conf)),
-      metric     = as.list(extract_fit(metr)),
-      scalar     = as.list(extract_fit(scal)),
-      diff_metric = summary(diff_metric),
-      diff_scalar = summary(diff_scalar)
+      configural  = fit_conf,
+      metric      = fit_metr,
+      scalar      = fit_scal,
+      diff_metric = calc_diff(fit_conf, fit_metr),
+      diff_scalar = calc_diff(fit_metr, fit_scal)
     ))
 
   }, error = function(e) {
