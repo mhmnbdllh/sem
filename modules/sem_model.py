@@ -282,18 +282,23 @@ def render_structural_paths(result, structural_paths):
         st.warning("No structural paths found in results.")
         return []
 
-    # Normalize column names
-    col_map = {}
-    for col in paths_df.columns:
-        cl = col.lower().replace(".", "_")
-        if cl in ["lhs","outcome"]:     col_map[col] = "outcome"
-        elif cl in ["rhs","predictor"]: col_map[col] = "predictor"
-        elif "std" in cl:               col_map[col] = "beta"
-        elif "se" == cl:                col_map[col] = "se"
-        elif "z" == cl:                 col_map[col] = "z"
-        elif "pvalue" in cl or cl == "p": col_map[col] = "p"
-        elif "est" == cl:               col_map[col] = "unstd"
-    paths_df = paths_df.rename(columns=col_map)
+    # Normalize column names - exact mapping
+    col_map = {
+        "outcome":   "outcome",
+        "predictor": "predictor",
+        "lhs":       "outcome",
+        "rhs":       "predictor",
+        "beta":      "beta",
+        "std.all":   "beta",
+        "unstd":     "unstd",
+        "est":       "unstd",
+        "se":        "se",
+        "z":         "z",
+        "p":         "p",
+        "pvalue":    "p",
+        "p-value":   "p",
+    }
+    paths_df = paths_df.rename(columns={c: col_map[c] for c in paths_df.columns if c in col_map})
 
     # Filter to hypothesized paths only
     hyp_pairs = [(str(pred), str(out)) for pred, out in structural_paths]
