@@ -97,7 +97,7 @@ def render_sem_estimation(syntax, df, constructs):
     st.subheader("Step 2: SEM Estimation")
 
     estimator = st.session_state.get("recommended_estimator", "MLR")
-    st.info(f"**Estimator:** {estimator} — based on Mardia's normality test.")
+    st.info(f"Estimator: {estimator} — based on Mardia's normality test.")
 
     all_items = list(set(
         item for items in constructs.values() for item in items
@@ -349,7 +349,7 @@ def render_structural_paths(result, structural_paths):
                         }]),
             use_container_width=True, hide_index=True
         )
-        st.caption("Note: * p < .05; ** p < .01; *** p < .001; dag p < .10")
+        st.caption("Note: * p < .05;  p < .01; * p < .001; dag p < .10")
 
     # Hypothesis testing table
     st.markdown("**Hypothesis Testing Results:**")
