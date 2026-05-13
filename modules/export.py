@@ -496,7 +496,7 @@ def generate_excel():
                         "z":         _fmt(_safe_float(p.get("z"))),
                         "p":         _fmt(p_val),
                         "Sig":       _stars(p_val),
-                        "Decision":  "Supported" if p_val and p_val < 0.05 else "Not Supported",
+                        "Decision":  "Supported" if p_val is not None and float(p_val) < 0.05 else "Not Supported",
                     })
                 pd.DataFrame(path_rows).to_excel(
                     writer, sheet_name="Structural Paths", index=False
@@ -525,9 +525,11 @@ def generate_excel():
                         "CI_Low":  _fmt(ci_lo) if ci_lo else "—",
                         "CI_High": _fmt(ci_hi) if ci_hi else "—",
                         "Sig":     (
-                            "Significant" if ci_lo and ci_hi and not (ci_lo <= 0 <= ci_hi)
+                            "Significant" if ci_lo is not None and ci_hi is not None and not (float(ci_lo) <= 0 <= float(ci_hi))
                             else "Not Significant"
-                        ) if key == "indirect" else "—",
+                        ) if key == "indirect" else (
+                            _stars(est) if est is not None else "—"
+                        ),
                     })
                 if med_rows:
                     pd.DataFrame(med_rows).to_excel(
