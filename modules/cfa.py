@@ -225,6 +225,14 @@ def render_factor_loadings(result, constructs):
         st.warning("No loadings available.")
         return {}
 
+    # DEBUG - remove after fix
+    st.write(f"DEBUG loadings type: {type(loadings_raw).__name__}")
+    if isinstance(loadings_raw, list) and len(loadings_raw) > 0:
+        st.write(f"DEBUG first item type: {type(loadings_raw[0]).__name__}")
+        st.write(f"DEBUG first item: {loadings_raw[0]}")
+    elif isinstance(loadings_raw, dict):
+        st.write(f"DEBUG dict keys: {list(loadings_raw.keys())[:5]}")
+
     if isinstance(loadings_raw, pd.DataFrame):
         loadings_df = loadings_raw
     elif isinstance(loadings_raw, list) and len(loadings_raw) > 0 and isinstance(loadings_raw[0], dict):
