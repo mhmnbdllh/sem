@@ -285,7 +285,7 @@ def render_factor_loadings(result, constructs):
             "Construct":     construct,
             "Item":          item,
             "Std Loading":   round(std, 3) if std else "—",
-            "p":             round(p_val, 3) if p_val else "—",
+            "p":             round(p_val, 3) if p_val is not None else "—",
             "Status":        status,
         })
 
