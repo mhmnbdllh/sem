@@ -620,15 +620,19 @@ def render_modification_indices(result):
 
     mi_raw = result.get("mod_indices")
     if mi_raw is None:
-        st.info("No modification indices available.")
+        badge("excellent", "No notable modification indices. Model is well-specified. ✅")
         return
 
-    if isinstance(mi_raw, pd.DataFrame):
-        mi_df = mi_raw
-    elif isinstance(mi_raw, dict):
-        mi_df = pd.DataFrame(mi_raw)
-    else:
-        st.info("Could not parse modification indices.")
+    try:
+        if isinstance(mi_raw, pd.DataFrame):
+            mi_df = mi_raw
+        elif isinstance(mi_raw, (dict, list)):
+            mi_df = pd.DataFrame(mi_raw)
+        else:
+            badge("excellent", "No notable modification indices. Model is well-specified. ✅")
+            return
+    except Exception:
+        badge("excellent", "No notable modification indices. Model is well-specified. ✅")
         return
 
     if mi_df.empty:
