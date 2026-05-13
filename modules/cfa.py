@@ -624,15 +624,9 @@ def render_modification_indices(result):
         return
 
     try:
-        if isinstance(mi_raw, pd.DataFrame):
-            mi_df = mi_raw
-        elif isinstance(mi_raw, (dict, list)):
-            mi_df = pd.DataFrame(mi_raw)
-        else:
-            badge("excellent", "No notable modification indices. Model is well-specified. ✅")
-            return
-    except Exception:
-        badge("excellent", "No notable modification indices. Model is well-specified. ✅")
+        mi_df = pd.DataFrame(mi_raw)
+    except Exception as e:
+        st.warning(f"Could not parse modification indices: {str(e)}")
         return
 
     if mi_df.empty:
