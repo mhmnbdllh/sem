@@ -227,6 +227,9 @@ def render_factor_loadings(result, constructs):
 
     if isinstance(loadings_raw, pd.DataFrame):
         loadings_df = loadings_raw
+    elif isinstance(loadings_raw, list) and len(loadings_raw) > 0 and isinstance(loadings_raw[0], dict):
+        # List of dicts - standard JSON array of objects from R
+        loadings_df = pd.DataFrame(loadings_raw)
     elif isinstance(loadings_raw, dict):
         loadings_df = pd.DataFrame(loadings_raw)
     else:
@@ -384,7 +387,9 @@ def render_reliability(result, constructs, df):
                         except: pass
 
         if ave_raw and isinstance(ave_raw, dict) and cname in ave_raw:
-            try: ave_val = float(ave_raw[cname])
+            try:
+                av = ave_raw[cname]
+                ave_val = float(av[0] if isinstance(av, list) else av)
             except: pass
 
         # Compute CR and AVE from loadings if not from R
