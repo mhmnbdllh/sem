@@ -167,7 +167,7 @@ def render_mediation_results(df, constructs, x_var, m_var, y_var, n_boot, ci_lev
             "beta":  round(est, 3) if est is not None else "—",
             "SE":    round(se, 3)  if se  is not None else "—",
             "p":     round(p_val, 4) if p_val is not None else "—",
-            "Sig.":  "Yes" if p_val and p_val < 0.05 else "No" if p_val is not None else "—",
+            "Sig.":  "Yes" if p_val is not None and p_val < 0.05 else "No" if p_val is not None else "—",
         })
 
     path_df = pd.DataFrame(path_rows)
