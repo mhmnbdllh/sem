@@ -238,15 +238,24 @@ def render_factor_loadings(result, constructs):
         return {}
 
     # Ensure correct column names
-    col_map = {}
-    for col in loadings_df.columns:
-        cl = col.lower().replace(".", "_")
-        if "construct" in cl or "lhs" in cl: col_map[col] = "construct"
-        elif "item" in cl or "rhs" in cl:    col_map[col] = "item"
-        elif "std" in cl:                     col_map[col] = "std"
-        elif col == "p" or "pvalue" in cl:   col_map[col] = "p"
-        elif "se" == cl:                      col_map[col] = "se"
-        elif "z" == cl:                       col_map[col] = "z"
+    # Direct column mapping - columns from lavaan are:
+    # construct, item, unstd, se, z, p, std
+    col_map = {
+        "construct": "construct",
+        "item":      "item",
+        "std":       "std",
+        "std.all":   "std",
+        "unstd":     "unstd",
+        "est":       "unstd",
+        "se":        "se",
+        "z":         "z",
+        "z-value":   "z",
+        "p":         "p",
+        "pvalue":    "p",
+        "p-value":   "p",
+        "lhs":       "construct",
+        "rhs":       "item",
+    }
     loadings_df = loadings_df.rename(columns=col_map)
 
     rows = []
