@@ -292,19 +292,19 @@ def render_sidebar():
         st.markdown("<hr style='border-color:#dde3ea;margin:12px 0'/>", unsafe_allow_html=True)
 
         with st.expander("References"):
-            st.markdown("""
-- Hair et al. (2019). *Multivariate Data Analysis*
-- Kline (2016). *Principles and Practice of SEM*
-- Brown (2015). *CFA for Applied Research*
-- Rosseel (2012). *lavaan: R Package for SEM*
-- Hu & Bentler (1999). *Cutoff criteria for fit*
-- Fornell & Larcker (1981). *Evaluating SEM*
-- Henseler et al. (2015). *HTMT criterion*
-- Hayes (2018). *Mediation and Moderation*
-- Aiken & West (1991). *Multiple Regression*
-- Vandenberg & Lance (2000). *MI literature*
-- Burnham & Anderson (2002). *Model Selection*
-            """)
+            st.markdown(
+                "- Hair et al. (2019). Multivariate Data Analysis  \n"
+                "- Kline (2016). Principles and Practice of SEM  \n"
+                "- Brown (2015). CFA for Applied Research  \n"
+                "- Rosseel (2012). lavaan: R Package for SEM  \n"
+                "- Hu & Bentler (1999). Cutoff criteria for fit  \n"
+                "- Fornell & Larcker (1981). Evaluating SEM  \n"
+                "- Henseler et al. (2015). HTMT criterion  \n"
+                "- Hayes (2018). Mediation and Moderation  \n"
+                "- Aiken & West (1991). Multiple Regression  \n"
+                "- Vandenberg & Lance (2000). MI literature  \n"
+                "- Burnham & Anderson (2002). Model Selection"
+            )
 
         st.markdown(
             '<div style="text-align:center;color:#aaa;font-size:0.68rem;padding:6px 0">'
