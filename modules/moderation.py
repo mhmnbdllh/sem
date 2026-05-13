@@ -171,18 +171,18 @@ def render_moderation_results(df, constructs, x_var, w_var, y_var, low_sd, high_
     n    = _safe_float(result.get("n"))
 
     coef_rows = [
-        {"Term": f"{x_var} (X)",      "beta": round(b1,3)  if b1   else "—",
+        {"Term": f"{x_var} (X)",      "beta": round(b1,3) if b1 is not None else "—",
          "SE": round(b1_se,3) if b1_se else "—",
          "t":  round(b1_t,3)  if b1_t  else "—",
          "p":  round(b1_p,4)  if b1_p is not None else "—",
          "Sig.": "Yes" if b1_p is not None and b1_p < 0.05 else "No"},
-        {"Term": f"{w_var} (W)",      "beta": round(b2,3)  if b2   else "—",
+        {"Term": f"{w_var} (W)",      "beta": round(b2,3) if b2 is not None else "—",
          "SE": round(b2_se,3) if b2_se else "—",
          "t":  round(b2_t,3)  if b2_t  else "—",
          "p":  round(b2_p,4)  if b2_p is not None else "—",
          "Sig.": "Yes" if b2_p is not None and b2_p < 0.05 else "No"},
         {"Term": f"{x_var} x {w_var} (interaction)",
-         "beta": round(b3,3)  if b3   else "—",
+         "beta": round(b3,3) if b3 is not None else "—",
          "SE":   round(b3_se,3) if b3_se else "—",
          "t":    round(b3_t,3)  if b3_t  else "—",
          "p":    round(b3_p,4)  if b3_p is not None else "—",
