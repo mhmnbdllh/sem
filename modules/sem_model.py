@@ -272,12 +272,10 @@ def render_structural_paths(result, structural_paths):
         st.warning("No structural paths available.")
         return []
 
-    if isinstance(paths_raw, pd.DataFrame):
-        paths_df = paths_raw
-    elif isinstance(paths_raw, dict):
+    try:
         paths_df = pd.DataFrame(paths_raw)
-    else:
-        st.warning("Could not parse structural paths.")
+    except Exception as e:
+        st.warning(f"Could not parse structural paths: {str(e)}")
         return []
 
     if paths_df.empty:
