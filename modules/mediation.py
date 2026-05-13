@@ -352,29 +352,19 @@ def render_mediation():
     x_var, m_var, y_var, n_boot, ci_level = setup
     st.markdown("---")
 
-    if st.button("Run Mediation Analysis via R/lavaan", type="primary",
-                 key="run_med_btn", use_container_width=True):
+    run_clicked = st.button("Run Mediation Analysis via R/lavaan", type="primary",
+                             key="run_med_btn", use_container_width=True)
+
+    if run_clicked:
         render_mediation_results(df, constructs, x_var, m_var, y_var, n_boot, ci_level)
-    elif st.session_state.get("mediation_results"):
+
+    if st.session_state.get("mediation_results"):
         vars_stored = st.session_state.get("mediation_vars", {})
         if (vars_stored.get("x") == x_var and
             vars_stored.get("m") == m_var and
-            vars_stored.get("y") == y_var):
-            # Re-display stored results
-            result = st.session_state["mediation_results"]
-            st.info("Showing previously computed results. Click the button above to re-run.")
-
-            indirect_data = result.get("indirect", {})
-            if isinstance(indirect_data, dict):
-                indirect = _safe_float(indirect_data.get("est"))
-                ci_lo    = _safe_float(indirect_data.get("ci_lo"))
-                ci_hi    = _safe_float(indirect_data.get("ci_hi"))
-                cp_data  = result.get("cp_path", {})
-                direct   = _safe_float(cp_data.get("est") if isinstance(cp_data, dict) else None)
-
-                if indirect is not None and ci_lo is not None and ci_hi is not None:
-                    r = interpret_mediation(indirect, ci_lo, ci_hi, direct, m_var, x_var, y_var)
-                    badge(r["level"], r["message"])
+            vars_stored.get("y") == y_var and
+            not run_clicked):
+            render_mediation_results(df, constructs, x_var, m_var, y_var, n_boot, ci_level)
 
     st.markdown("---")
     badge("ok", "Mediation analysis complete. Proceed to Moderation Analysis or Export Report.")
