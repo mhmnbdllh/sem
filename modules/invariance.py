@@ -185,7 +185,7 @@ def render_fit_comparison(result, group1, group2):
         df_  = fit.get("df")
         rows.append({
             "Model":  label,
-            "chi2":   round(chi2, 3) if chi2 else "—",
+            "chi2":   round(chi2, 3) if chi2 is not None else "—",
             "df":     int(df_) if df_ else "—",
             "RMSEA":  round(fit.get("rmsea", 0), 3) if fit.get("rmsea") else "—",
             "CFI":    round(fit.get("cfi",   0), 3) if fit.get("cfi")   else "—",
