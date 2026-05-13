@@ -18,6 +18,9 @@ COLORS = {
 
 def badge(level, message):
     color = COLORS.get(level, "#555555")
+    import re
+    # Convert **text** to <b>text</b> for HTML rendering
+    message = re.sub(r'[*][*](.+?)[*][*]', r'<b>\1</b>', str(message))
     st.markdown(
         f'<div style="background:{color}18;border-left:4px solid {color};'
         f'padding:10px 14px;border-radius:4px;margin:6px 0;'
@@ -407,7 +410,7 @@ def render_information_criteria(fit_results):
     st.plotly_chart(fig, use_container_width=True)
 
     badge("ok",
-        f"Best-fitting model by AIC: **{best_aic}** (AIC = {round(min_aic, 2)}). "
+        f"Best-fitting model by AIC: <b>{best_aic}</b> (AIC = {round(min_aic, 2)}). "
         "Report the full model comparison table in your methods section."
     )
 
@@ -460,10 +463,10 @@ def render_model_recommendation(fit_results):
     )
 
     badge("excellent",
-        f"Recommended model: **{best_model}** "
+        f"Recommended model: <b>{best_model}</b> "
         f"({max_score}/6 criteria met, best or tied AIC). "
         "This recommendation is based on fit index adequacy and AIC. "
-        "**Final model selection must always be guided by theoretical considerations**, not statistics alone."
+        "<b>Final model selection must always be guided by theoretical considerations</b>, not statistics alone."
     )
 
     st.session_state["best_model"] = best_model
