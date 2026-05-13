@@ -84,7 +84,7 @@ def render_group_setup(df, assignments):
     )
 
     unique_vals = sorted(df[group_var].dropna().unique())
-    st.markdown(f"**Unique values in {group_var}:** {list(unique_vals)}")
+    st.markdown(f"Unique values in {group_var}: {list(unique_vals)}")
 
     if len(unique_vals) < 2:
         st.error("Grouping variable must have at least 2 unique values.")
@@ -121,9 +121,9 @@ def render_invariance_tests(df, constructs, group_var, group1, group2):
     st.subheader("Step 2: Invariance Model Tests")
     st.markdown(
         "Three sequential models are tested, each adding more constraints:\n\n"
-        "1. **Configural** — same factor structure (least constrained)\n"
-        "2. **Metric** — equal factor loadings across groups\n"
-        "3. **Scalar** — equal item intercepts (most constrained)"
+        "1. Configural — same factor structure (least constrained)\n"
+        "2. Metric — equal factor loadings across groups\n"
+        "3. Scalar — equal item intercepts (most constrained)"
     )
 
     all_items = list(set(
@@ -259,11 +259,11 @@ def render_fit_comparison(result, group1, group2):
 
         diff_rows.append({
             "Comparison":  label,
-            "Delta chi2":  round(delta_chi2, 3)  if delta_chi2  else "—",
+            "Delta chi2":  round(delta_chi2, 3) if delta_chi2 is not None else "—",
             "Delta df":    delta_df               if delta_df    else "—",
-            "p(Delta chi2)":round(p_chi2, 4)     if p_chi2      else "—",
-            "Delta CFI":   round(delta_cfi, 4)   if delta_cfi   else "—",
-            "Delta RMSEA": round(delta_rmsea, 4) if delta_rmsea else "—",
+            "p(Delta chi2)":round(p_chi2, 4) if p_chi2 is not None else "—",
+            "Delta CFI":   round(delta_cfi, 4) if delta_cfi is not None else "—",
+            "Delta RMSEA": round(delta_rmsea, 4) if delta_rmsea is not None else "—",
             "Invariance":  "Supported" if supported else "Not Supported",
         })
 
