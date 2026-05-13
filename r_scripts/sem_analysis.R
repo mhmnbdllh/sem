@@ -228,11 +228,29 @@ run_cfa <- function(data, model_syntax, estimator = "MLR") {
       lavaan::modindices(fit, sort. = TRUE, maximum.number = 10)
     }, error = function(e) NULL)
 
+    # Convert AVE to named list
+    ave_named <- if (!is.null(ave)) {
+      as.list(setNames(as.numeric(ave), names(ave)))
+    } else NULL
+
+    # Convert reliability to named list per construct
+    rel_named <- if (!is.null(rel) && (is.matrix(rel) || is.data.frame(rel))) {
+      rel_list <- list()
+      for (cn in colnames(rel)) {
+        rel_list[[cn]] <- list(
+          alpha = tryCatch(as.numeric(rel["alpha", cn]), error=function(e) NA),
+          omega = tryCatch(as.numeric(rel["omega2", cn]), error=function(e) NA),
+          cr    = tryCatch(as.numeric(rel["omega3", cn]), error=function(e) NA)
+        )
+      }
+      rel_list
+    } else NULL
+
     return(list(
       fit_indices  = as.list(round(fit_indices, 4)),
       loadings     = loadings,
-      reliability  = rel,
-      ave          = ave,
+      reliability  = rel_named,
+      ave          = ave_named,
       htmt         = htmt,
       mod_indices  = mi,
       n            = nrow(data),
