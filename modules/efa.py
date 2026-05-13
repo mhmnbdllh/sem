@@ -47,7 +47,7 @@ def render_factorability(result):
     if isinstance(bart_p, list):    bart_p    = bart_p[0]
 
     c1, c2, c3 = st.columns(3)
-    c1.metric("KMO Overall",       f"{kmo:.3f}" if kmo else "N/A")
+    c1.metric("KMO Overall",       f"{kmo:.3f}" if kmo is not None else "N/A")
     c2.metric("Bartlett's chi2",   f"{float(bart_chi2):.3f}" if bart_chi2 else "N/A")
     c3.metric("Bartlett's p-value","< .001" if bart_p is not None and float(bart_p) < 0.001 else f"{float(bart_p):.4f}" if bart_p is not None else "N/A")
 
@@ -230,7 +230,7 @@ def render_loadings_table(result, item_names, n_factors):
     # Variance explained
     var_explained = result.get("var_explained")
     if var_explained and isinstance(var_explained, dict):
-        st.markdown("**Variance Explained:**")
+        st.markdown("Variance Explained:")
         var_rows = []
         row_names = list(var_explained.keys())
         for rn in row_names:
@@ -398,7 +398,7 @@ def render_efa():
         return
 
     data = df[indicator_cols].dropna()
-    st.info(f"Analyzing **{len(indicator_cols)} items** across **{len(data)} complete cases**.")
+    st.info(f"Analyzing {len(indicator_cols)} items across {len(data)} complete cases.")
     st.markdown("---")
 
     # EFA settings
@@ -476,7 +476,7 @@ def render_efa():
     stored_nf     = stored_result.get("n_factors")
     if isinstance(stored_nf, list): stored_nf = stored_nf[0]
     if stored_nf and int(stored_nf) != n_factors:
-        badge("warning", f"You changed the number of factors to {n_factors}. Click **Run EFA** again to update.")
+        badge("warning", f"You changed the number of factors to {n_factors}. Click Run EFA again to update.")
 
     loadings_mat = render_loadings_table(result, indicator_cols, n_factors)
     if loadings_mat is None:
