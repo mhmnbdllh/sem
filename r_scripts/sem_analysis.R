@@ -570,7 +570,7 @@ run_model_comparison <- function(data, models, estimator = "MLR") {
       fi  <- lavaan::fitMeasures(fit, c(
         "chisq", "df", "pvalue", "rmsea", "cfi", "tli", "srmr", "aic", "bic"
       ))
-      results[[name]] <- round(fi, 4)
+      results[[name]] <- as.list(round(fi, 4))
       fitted[[name]]  <- fit
     }, error = function(e) {
       results[[name]] <- list(error = conditionMessage(e))
