@@ -73,7 +73,7 @@ def render_estimation(syntax, df, constructs):
 
     estimator = st.session_state.get("recommended_estimator", "MLR")
     st.info(
-        f"**Estimator:** {estimator} "
+        f"Estimator: {estimator} "
         f"(based on Mardia's normality test — see Descriptive Statistics). "
         "Override in Descriptive Statistics if needed."
     )
