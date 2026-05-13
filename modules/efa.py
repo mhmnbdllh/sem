@@ -49,7 +49,7 @@ def render_factorability(result):
     c1, c2, c3 = st.columns(3)
     c1.metric("KMO Overall",       f"{kmo:.3f}" if kmo else "N/A")
     c2.metric("Bartlett's chi2",   f"{float(bart_chi2):.3f}" if bart_chi2 else "N/A")
-    c3.metric("Bartlett's p-value","< .0001" if bart_p and float(bart_p) < 0.0001 else f"{float(bart_p):.4f}" if bart_p else "N/A")
+    c3.metric("Bartlett's p-value","< .001" if bart_p is not None and float(bart_p) < 0.001 else f"{float(bart_p):.4f}" if bart_p is not None else "N/A")
 
     if kmo:
         r = interpret_kmo(kmo)
@@ -87,7 +87,7 @@ def render_factorability(result):
                 use_container_width=True, hide_index=True
             )
 
-    factorable = (kmo and kmo >= 0.60) and (bart_p and float(bart_p) < 0.05)
+    factorable = (kmo is not None and kmo >= 0.60) and (bart_p is not None and float(bart_p) < 0.05)
     return factorable
 
 
