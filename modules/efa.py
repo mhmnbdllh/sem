@@ -459,7 +459,7 @@ def render_efa():
 
     result = st.session_state.get("efa_result")
     if result is None:
-        st.info("Configure settings above and click **Run EFA** to begin.")
+        st.info("Configure settings above and click Run EFA to begin.")
         return
 
     st.markdown("---")
