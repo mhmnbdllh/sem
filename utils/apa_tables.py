@@ -124,7 +124,7 @@ def fit_indices_table(fit_dict: dict) -> pd.DataFrame:
                 val_f = float(val)
                 from utils.thresholds import interpret_fit
                 _, _, level = interpret_fit(key, val_f)
-                indicator = "OK" if level in ("excellent","good") else "Warning" if level == "acceptable" else "Poor" if level == "poor" else ""
+                indicator = "OK" if level in ("excellent","good","info") else "Warning" if level == "acceptable" else "Poor" if level == "poor" else "-"
                 rows.append({
                     "Index":     label,
                     "Value":     f"{val_f:.3f} [{indicator}]",
