@@ -588,13 +588,13 @@ def render_validity(metrics, df, constructs):
             for j, c2 in enumerate(cn):
                 if i == j:
                     ave = metrics.get(c1, {}).get("ave")
-                    fl_df.loc[c1, c2] = f"**{np.sqrt(ave):.3f}**" if ave else "—"
+                    fl_df.loc[c1, c2] = f"{np.sqrt(ave):.3f} (*)" if ave else "—"
                 else:
                     r = corr.loc[c1, c2] if c1 in corr.index and c2 in corr.columns else np.nan
                     fl_df.loc[c1, c2] = f"{r:.3f}" if not np.isnan(r) else "—"
 
         st.dataframe(fl_df, use_container_width=True)
-        st.caption("Note: Bold diagonal = sqrt(AVE). Discriminant validity supported when sqrt(AVE) > all off-diagonal values in same row/column.")
+        st.caption("Note: Diagonal (*) = sqrt(AVE). Discriminant validity supported when sqrt(AVE) > all off-diagonal values in same row/column.")
 
         # Fornell-Larcker check
         fl_pass = True
