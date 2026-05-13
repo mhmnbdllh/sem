@@ -61,7 +61,7 @@ def render_model_spec(constructs):
         for cname, items in constructs.items():
             n = len(items)
             ok = "OK" if n >= 3 else "Warning"
-            st.markdown(f"- **{cname}**: {n} indicators — {', '.join(items)}")
+            st.markdown(f"- {cname}: {n} indicators — {', '.join(items)}")
             if n < 3:
                 badge("warning", f"{cname} has only {n} indicator(s). Minimum is 3 for reliable CFA.")
 
@@ -101,7 +101,7 @@ def render_estimation(syntax, df, constructs):
 
             if "error" in result:
                 st.error(f"CFA estimation failed: {result['error']}")
-                st.markdown("**Common fixes:**")
+                st.markdown("Common fixes:")
                 st.markdown("- Ensure item names in syntax match column names exactly")
                 st.markdown("- Check for missing values")
                 st.markdown("- Verify each construct has at least 3 indicators")
@@ -127,7 +127,7 @@ def render_fit_indices(result):
     st.subheader("Step 3: Model Fit Assessment")
     st.markdown(
         "Fit indices assess how well the hypothesized factor structure reproduces "
-        "the observed covariance matrix. **Multiple criteria** should be evaluated jointly."
+        "the observed covariance matrix. Multiple criteria should be evaluated jointly."
     )
 
     fit_raw = result.get("fit_indices")
@@ -167,7 +167,7 @@ def render_fit_indices(result):
 
     chi2 = normalized.get("chi2") or normalized.get("chisq_scaled")
     df_  = normalized.get("df") or normalized.get("df_scaled")
-    if chi2 and df_ and float(df_) > 0:
+    if chi2 is not None and df_ and float(df_) > 0:
         cols[0].metric("chi2/df", f"{chi2/df_:.3f}")
 
     for i, idx in enumerate(indices):
@@ -177,7 +177,7 @@ def render_fit_indices(result):
             cols[i+1].metric(idx.upper(), f"{val:.3f}", label)
 
     # Full APA table
-    st.markdown("**Complete Fit Indices:**")
+    st.markdown("Complete Fit Indices:")
     fit_df = fit_indices_table(normalized)
     if not fit_df.empty:
         st.dataframe(
@@ -220,7 +220,7 @@ def render_factor_loadings(result, constructs):
     st.subheader("Step 4: Factor Loadings")
     st.markdown(
         f"Standardized factor loadings (lambda). "
-        f"**Criterion:** lambda >= .70 (strong); lambda >= .50 (acceptable)."
+        "Criterion: lambda >= .70 (strong); lambda >= .50 (acceptable)."
     )
 
     loadings_raw = result.get("loadings")
@@ -280,8 +280,8 @@ def render_factor_loadings(result, constructs):
         except: p_val = None
 
         status = (
-            "Strong"      if std and abs(std) >= 0.70 else
-            "Acceptable"  if std and abs(std) >= 0.50 else
+            "Strong"      if std is not None and abs(std) >= 0.70 else
+            "Acceptable"  if std is not None and abs(std) >= 0.50 else
             "Weak"
         )
         rows.append({
@@ -449,7 +449,7 @@ def render_reliability(result, constructs, df):
     # Per-construct interpretations
     with st.expander("Construct-by-Construct Interpretation"):
         for cname, m in metrics.items():
-            st.markdown(f"**{cname}:**")
+            st.markdown(f"{cname}:")
             if m.get("alpha"): badge(**interpret_alpha(m["alpha"], cname))
             if m.get("cr"):    badge(**interpret_cr(m["cr"], cname))
             if m.get("ave"):   badge(**interpret_ave(m["ave"], cname))
@@ -559,7 +559,7 @@ def render_validity(metrics, df, constructs):
                         if denom > 0:
                             htmt_mat.loc[c1, c2] = round(mean_cross / denom, 3)
 
-        st.markdown("**HTMT Matrix:**")
+        st.markdown("HTMT Matrix:")
         htmt_display = htmt_table(htmt_mat)
         st.dataframe(
             htmt_display.style.set_properties(**{"color":"#1a1a1a","background-color":"#ffffff"})
@@ -581,7 +581,7 @@ def render_validity(metrics, df, constructs):
                             badge(r["level"], r["message"])
 
         # Fornell-Larcker
-        st.markdown("**Fornell-Larcker Criterion:**")
+        st.markdown("Fornell-Larcker Criterion:")
         st.markdown("Diagonal = sqrt(AVE). Off-diagonal = inter-construct correlations.")
         fl_df = pd.DataFrame(index=cn, columns=cn, dtype=object)
         for i, c1 in enumerate(cn):
@@ -606,7 +606,7 @@ def render_validity(metrics, df, constructs):
                 if cname != other and other in corr.columns:
                     r = abs(corr.loc[cname, other])
                     if sqrt_ave <= r:
-                        badge("warning", f"Fornell-Larcker violated: **{cname}** sqrt(AVE) ({sqrt_ave:.3f}) <= correlation with **{other}** ({r:.3f}).")
+                        badge("warning", f"Fornell-Larcker violated: {cname} sqrt(AVE) ({sqrt_ave:.3f}) <= correlation with **{other}** ({r:.3f}).")
                         fl_pass = False
         if fl_pass:
             badge("excellent", "Fornell-Larcker criterion satisfied for all construct pairs. Discriminant validity supported. ✅")
@@ -644,7 +644,7 @@ def render_modification_indices(result):
             st.warning(f"{len(notable)} modification index/indices above threshold (MI >= 3.84):")
             st.dataframe(notable.round(3), use_container_width=True, hide_index=True)
             badge("warning",
-                "Consider freeing parameters with large MI **only if theoretically justified**. "
+                "Consider freeing parameters with large MI only if theoretically justified. "
                 "Purely data-driven modifications lead to overfitting."
             )
         else:
