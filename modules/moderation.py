@@ -96,7 +96,7 @@ def render_moderation_setup(constructs):
         unsafe_allow_html=True,
     )
 
-    st.markdown("**Moderator levels for simple slope plots:**")
+    st.markdown("Moderator levels for simple slope plots:")
     c1, c2, c3 = st.columns(3)
     with c1:
         low_sd  = st.number_input("Low W (-1 SD)", value=-1.0, step=0.5, key="mod_low")
@@ -207,7 +207,7 @@ def render_moderation_results(df, constructs, x_var, w_var, y_var, low_sd, high_
     st.caption("Note: Variables mean-centered prior to interaction computation (Aiken & West, 1991).")
 
     # ── R2 Summary ─────────────────────────────────────────────
-    st.markdown("**Model R2 Summary:**")
+    st.markdown("Model R2 Summary:")
     r2_rows = [
         {"Model": f"Model 1: {x_var} + {w_var} (no interaction)",
          "R2": round(r2_1, 4) if r2_1 else "—", "Delta R2": "—"},
@@ -251,7 +251,7 @@ def render_moderation_results(df, constructs, x_var, w_var, y_var, low_sd, high_
                 "W Level":          label,
                 "Simple Slope (b)": round(slope, 4) if slope else "—",
                 "SE":               round(se, 4)    if se    else "—",
-                "t":                round(t_val, 3) if t_val else "—",
+                "t":                round(t_val, 3) if t_val is not None else "—",
                 "p":                round(p_val, 4) if p_val is not None else "—",
                 "Sig.":             "Yes" if p_val is not None and p_val < 0.05 else "No",
             })
