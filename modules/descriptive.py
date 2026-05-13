@@ -273,7 +273,7 @@ def render_normality(df, indicator_cols):
     st.subheader("Multivariate Normality — Mardia's Test (via R/psych)")
     st.markdown(
         "Mardia's test assesses multivariate normality — a key assumption for ML estimation. "
-        "Violation suggests using **MLR** (Robust ML) instead."
+        "Violation suggests using MLR (Robust ML) instead."
     )
 
     data = df[indicator_cols].dropna()
@@ -302,9 +302,9 @@ def render_normality(df, indicator_cols):
 
         c1, c2 = st.columns(2)
         c1.metric("Mardia's Skewness", f"{result.get('skewness', 'N/A'):.3f}" if result.get("skewness") else "N/A",
-                  f"p = {sk_p:.4f}" if sk_p else "N/A")
+                  f"p = {sk_p:.4f}" if sk_p is not None else "N/A")
         c2.metric("Mardia's Kurtosis (z)", f"{result.get('kurtosis', 'N/A'):.3f}" if result.get("kurtosis") else "N/A",
-                  f"p = {ku_p:.4f}" if ku_p else "N/A")
+                  f"p = {ku_p:.4f}" if ku_p is not None else "N/A")
 
         interp = interpret_mardia(sk_p, ku_p)
         badge(interp["level"], interp["message"])
@@ -368,7 +368,7 @@ def render_correlation_matrix(df, indicator_cols):
     if high:
         st.warning("High correlations detected (r > .85) — potential multicollinearity:")
         for c1, c2, r in high:
-            st.markdown(f"  - **{c1}** and **{c2}**: r = {r:.3f}")
+            st.markdown(f"  - {c1} and {c2}: r = {r:.3f}")
     else:
         badge("excellent", "No problematic multicollinearity detected (all r <= .85).")
 
@@ -377,7 +377,7 @@ def render_harman_test(df, indicator_cols):
     st.subheader("Common Method Bias — Harman's Single Factor Test")
     st.markdown(
         "When all data come from a single source (self-report), common method bias (CMB) "
-        "may inflate correlations. **Criterion:** If a single factor explains > 50% of variance, "
+        "may inflate correlations. Criterion: If a single factor explains > 50% of variance, "
         "CMB is a concern."
     )
 
@@ -478,7 +478,7 @@ def render_estimator_recommendation():
     )
     if override != "Auto (recommended)":
         st.session_state["recommended_estimator"] = override
-        badge("ok", f"Estimator manually set to **{override}**.")
+        badge("ok", f"Estimator manually set to {override}.")
 
 
 def render_descriptive():
