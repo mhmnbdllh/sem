@@ -80,7 +80,7 @@ def render_sem_spec(constructs, structural_paths):
 
     c1, c2 = st.columns(2)
     with c1:
-        st.markdown("**Exogenous constructs** (predictors only):")
+        st.markdown("Exogenous constructs (predictors only):")
         for c in sorted(exogenous):
             st.markdown(f"  - {c}")
     with c2:
@@ -122,7 +122,7 @@ def render_sem_estimation(syntax, df, constructs):
 
             if "error" in result:
                 st.error(f"SEM estimation failed: {result['error']}")
-                st.markdown("**Troubleshooting:**")
+                st.markdown("Troubleshooting:")
                 st.markdown("- Ensure all item names match your data columns exactly")
                 st.markdown("- Verify the measurement model (CFA) was validated first")
                 st.markdown("- Check for missing values in indicator columns")
@@ -147,7 +147,7 @@ def render_sem_estimation(syntax, df, constructs):
 def render_sem_fit(result):
     st.subheader("Step 3: Model Fit Assessment")
     st.markdown(
-        "Fit indices for the **full SEM**. "
+        "Fit indices for the full SEM. "
         "Compare with CFA fit — SEM fit should not be substantially worse."
     )
 
@@ -187,7 +187,7 @@ def render_sem_fit(result):
         val = normalized.get(key)
         col.metric(key.upper(), f"{val:.3f}" if val is not None else "—")
 
-    if chi2 and df_ and float(df_) > 0:
+    if chi2 is not None and df_ and float(df_) > 0:
         ratio = float(chi2) / float(df_)
         badge(
             "ok" if ratio <= 5 else "warning",
@@ -196,7 +196,7 @@ def render_sem_fit(result):
         )
 
     # Full table
-    st.markdown("**Complete Fit Indices:**")
+    st.markdown("Complete Fit Indices:")
     fit_df = fit_indices_table(normalized)
     if not fit_df.empty:
         st.dataframe(
@@ -352,7 +352,7 @@ def render_structural_paths(result, structural_paths):
         st.caption("Note: * p < .05;  p < .01; * p < .001; dag p < .10")
 
     # Hypothesis testing table
-    st.markdown("**Hypothesis Testing Results:**")
+    st.markdown("Hypothesis Testing Results:")
     hyp_rows = []
     for i, p in enumerate(path_results):
         hyp_rows.append({
@@ -389,15 +389,15 @@ def render_structural_paths(result, structural_paths):
         b = p["beta"]
         f2 = b**2 / (1 - b**2) if abs(b) < 1 else None
         size = (
-            "Large"      if f2 and f2 >= 0.35 else
-            "Medium"     if f2 and f2 >= 0.15 else
-            "Small"      if f2 and f2 >= 0.02 else
+            "Large"      if f2 is not None and f2 >= 0.35 else
+            "Medium"     if f2 is not None and f2 >= 0.15 else
+            "Small"      if f2 is not None and f2 >= 0.02 else
             "Negligible"
         )
         ef_rows.append({
             "Path":   f"{p['predictor']} --> {p['outcome']}",
             "beta":   round(b, 3),
-            "f2":     round(f2, 3) if f2 else "—",
+            "f2":     round(f2, 3) if f2 is not None else "—",
             "Effect": size,
         })
     st.dataframe(pd.DataFrame(ef_rows).style.set_properties(**{"color":"#1a1a1a"}),
@@ -441,7 +441,7 @@ def render_structural_paths(result, structural_paths):
 def render_r_squared(result, endogenous):
     st.subheader("Step 5: Explained Variance (R2)")
     st.markdown(
-        "R2 indicates the proportion of variance in each **endogenous construct** "
+        "R2 indicates the proportion of variance in each endogenous construct "
         "explained by its predictors. "
         "Criterion: R2 >= .26 (substantial), >= .13 (moderate), >= .02 (weak) — Cohen (1988)."
     )
