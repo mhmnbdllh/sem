@@ -98,11 +98,15 @@ def fit_indices_table(fit_dict: dict) -> pd.DataFrame:
         })
         if float(df_) > 0:
             ratio = float(chi2) / float(df_)
-            label = "Good" if ratio <= 2 else "Acceptable" if ratio <= 5 else "Poor"
+            from utils.thresholds import interpret_fit
+            _, _, level = interpret_fit("chisq_df", ratio)
+            if level == "good":       indicator = "Good"
+            elif level == "acceptable": indicator = "Acceptable"
+            else:                     indicator = "Poor"
             rows.append({
                 "Index":     "chi2/df",
-                "Value":     f"{ratio:.3f}",
-                "Criterion": f"<=2.0 (good); <=5.0 (acceptable) [{label}]",
+                "Value":     f"{ratio:.3f} [{indicator}]",
+                "Criterion": "<=2.0 (good); <=5.0 (acceptable)",
                 "Reference": "Kline (2016)",
             })
 
