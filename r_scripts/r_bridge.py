@@ -288,19 +288,22 @@ def run_model_comparison(df: pd.DataFrame, all_cols: list,
     data = df[all_cols].dropna()
     csv_path = _df_to_r_csv(data)
 
-    models_r = "list(" + ", ".join(
-        f'"{k}"="{v.replace(chr(34), chr(39)).replace(chr(10), " ")}"'
-        for k, v in models.items()
-    ) + ")"
+    # Write each model syntax to temp file and read in R
+    import json as _json
+    models_json_path = csv_path.replace(".csv", "_models.json")
+    with open(models_json_path, "w", encoding="utf-8") as f:
+        _json.dump(models, f)
 
     r_code = f"""
 source("{_escape(_R_SCRIPT_PATH)}")
 data <- read.csv("{_escape(csv_path)}")
-models <- {models_r}
+models_raw <- jsonlite::fromJSON("{_escape(models_json_path)}")
+models <- as.list(models_raw)
 result <- run_model_comparison(data, models, "{estimator}")
 .SEM_RESULT <- result
 """
     res = _run_r(r_code)
-    try: os.unlink(csv_path)
-    except: pass
+    for f in [csv_path, models_json_path]:
+        try: os.unlink(f)
+        except: pass
     return res
