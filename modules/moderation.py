@@ -20,6 +20,9 @@ COLORS = {
 
 def badge(level, message):
     color = COLORS.get(level, "#555555")
+    import re
+    # Convert **text** to <b>text</b> for HTML rendering
+    message = re.sub(r'[*][*](.+?)[*][*]', r'<b>\1</b>', str(message))
     st.markdown(
         f'<div style="background:{color}18;border-left:4px solid {color};'
         f'padding:10px 14px;border-radius:4px;margin:6px 0;'
