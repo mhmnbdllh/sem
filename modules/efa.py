@@ -131,7 +131,8 @@ def render_factor_number(result):
                     height=350, font_color="#1a1a1a",
                     plot_bgcolor="#ffffff", paper_bgcolor="#ffffff"
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                fig.update_coloraxes(showscale=False)
+        st.plotly_chart(fig, use_container_width=True)
 
     c1, c2 = st.columns(2)
     c1.metric("Parallel Analysis Suggests", f"{suggested} factor(s)")
@@ -281,7 +282,6 @@ def render_loadings_table(result, item_names, n_factors):
         )
         fig.update_layout(
             height=max(200, n_factors * 70),
-            coloraxis_colorbar=dict(thickness=10, len=0.75, title="", tickfont=dict(size=9)),
             font_color="#1a1a1a",
             plot_bgcolor="#ffffff",
             paper_bgcolor="#ffffff",
