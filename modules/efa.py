@@ -32,7 +32,7 @@ def badge(level, message):
 
 
 def render_factorability(result):
-    st.subheader("Step 1: Factorability Tests")
+    st.subheader("Step 3: Factorability Tests")
     st.markdown(
         "**KMO** and **Bartlett's Test** confirm whether data are suitable for factor analysis."
     )
@@ -92,7 +92,7 @@ def render_factorability(result):
 
 
 def render_factor_number(result):
-    st.subheader("Step 2: Determining Number of Factors")
+    st.subheader("Step 4: Scree Plot and Factor Number Confirmation")
     st.markdown(
         "**Parallel Analysis** (gold standard via R/psych) + **Kaiser criterion** "
         "(eigenvalue > 1) + **Scree plot**."
@@ -142,16 +142,14 @@ def render_factor_number(result):
         "Always combine statistical criteria with theoretical justification."
     )
 
-    # Auto-update widget to match parallel analysis suggestion
-    if st.session_state.get("efa_suggested") != suggested:
-        st.session_state["efa_suggested"]       = suggested
-        st.session_state["efa_n_factors_widget"] = suggested
-
+    # Show parallel analysis suggestion as info only
+    # Widget uses current session value or suggestion as default
+    current = st.session_state.get("efa_n_factors_widget", suggested)
     n_factors = st.number_input(
         "Number of factors to extract:",
         min_value=1,
         max_value=20,
-        value=suggested,
+        value=int(current),
         step=1,
         key="efa_n_factors_widget"
     )
@@ -159,7 +157,7 @@ def render_factor_number(result):
 
 
 def render_loadings_table(result, item_names, n_factors):
-    st.subheader("Step 4: Factor Loading Matrix")
+    st.subheader("Step 5: Factor Loading Matrix")
     st.markdown(
         f"Factor loadings (PAF extraction via R/psych). "
         f"**Strong:** lambda >= .70 | **Acceptable:** lambda >= .50 | **Weak:** lambda < .50. "
@@ -309,7 +307,7 @@ def render_factor_naming_setup(n_factors_expected):
     constructs      = st.session_state.get("constructs", {})
     construct_names = list(constructs.keys())
 
-    st.subheader("Step 4: Assign Construct Names to Factors")
+    st.subheader("Step 2b: Assign Construct Names to Factors")
     st.markdown(
         "Assign a name to each factor before running EFA. "
         "Use the same names as Data Input to ensure consistency across all modules."
@@ -382,7 +380,7 @@ def render_factor_naming(loadings_mat, n_factors):
     Step shown AFTER Run EFA — displays factor loading table with assigned names.
     Names already set in render_factor_naming_setup().
     """
-    st.subheader("Step 5: Factor Assignment Summary")
+    st.subheader("Step 6: Factor Assignment Summary")
     st.markdown("Factor names assigned in Step 3b, shown here with loading results.")
 
     factor_cols  = [f"F{i+1}" for i in range(n_factors) if f"F{i+1}" in loadings_mat.columns]
@@ -398,7 +396,7 @@ def render_factor_naming(loadings_mat, n_factors):
 
 
 def render_efa_summary(loadings_mat, n_factors, factor_names, item_names):
-    st.subheader("Step 6: EFA Summary and CFA Preparation")
+    st.subheader("Step 7: EFA Summary and CFA Preparation")
     st.markdown("Suggested construct structure for CFA based on EFA results.")
 
     factor_cols = [f"F{i+1}" for i in range(n_factors) if f"F{i+1}" in loadings_mat.columns]
@@ -464,7 +462,7 @@ def render_efa():
     st.markdown("---")
 
     # EFA settings
-    st.subheader("Step 3: Extraction and Rotation Settings")
+    st.subheader("Step 1: Extraction and Rotation Settings")
     col1, col2 = st.columns(2)
     with col1:
         rotation = st.selectbox(
@@ -490,7 +488,7 @@ def render_efa():
     st.markdown("---")
 
     # Number of factors - BEFORE Run EFA
-    st.subheader("Step 4: Number of Factors and Construct Names")
+    st.subheader("Step 2: Number of Factors and Construct Names")
     constructs_preview = st.session_state.get("constructs", {})
     suggested_default  = len(constructs_preview) if constructs_preview else 2
 
