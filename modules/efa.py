@@ -309,7 +309,7 @@ def render_factor_naming_setup(n_factors_expected):
     constructs      = st.session_state.get("constructs", {})
     construct_names = list(constructs.keys())
 
-    st.subheader("Step 3b: Assign Construct Names to Factors")
+    st.subheader("Step 4: Assign Construct Names to Factors")
     st.markdown(
         "Assign a name to each factor before running EFA. "
         "Use the same names as Data Input to ensure consistency across all modules."
@@ -490,7 +490,7 @@ def render_efa():
     st.markdown("---")
 
     # Number of factors - BEFORE Run EFA
-    st.subheader("Step 3b: Number of Factors and Construct Names")
+    st.subheader("Step 4: Number of Factors and Construct Names")
     constructs_preview = st.session_state.get("constructs", {})
     suggested_default  = len(constructs_preview) if constructs_preview else 2
 
