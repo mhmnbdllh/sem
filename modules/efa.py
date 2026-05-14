@@ -305,70 +305,72 @@ def render_loadings_table(result, item_names, n_factors):
     return loadings_mat
 
 
-def _auto_name_factors(loadings_mat, constructs):
+def render_factor_naming_setup(n_factors_expected):
     """
-    Auto-assign construct names to EFA factors based on which construct's
-    items load highest (mean abs loading) on each factor.
+    Step shown BEFORE Run EFA — user assigns construct names to factor slots.
+    Uses selectbox with construct names from Data Input.
     """
-    factor_cols = [c for c in loadings_mat.columns if c.startswith("F")]
-    auto_names  = {}
-    used_names  = []
-    for f in factor_cols:
-        best_construct = None
-        best_score     = -1
-        for cname, items in constructs.items():
-            valid = [i for i in items if i in loadings_mat.index]
-            if not valid:
-                continue
-            score = loadings_mat.loc[valid, f].abs().mean()
-            if score > best_score:
-                best_score     = score
-                best_construct = cname
-        if best_construct and best_construct not in used_names:
-            auto_names[f] = best_construct
-            used_names.append(best_construct)
-        else:
-            auto_names[f] = f"Factor{f[1:]}"
-    return auto_names
+    st.subheader("Step 3b: Assign Construct Names to Factors")
+    st.markdown(
+        "Before running EFA, assign which **construct** corresponds to each factor. "
+        "Use the same names as defined in Data Input to ensure consistency across all modules."
+    )
+
+    constructs     = st.session_state.get("constructs", {})
+    construct_names = list(constructs.keys())
+
+    if not construct_names:
+        st.warning("No constructs defined in Data Input. Please complete Data Input first.")
+        return {}
+
+    factor_names = {}
+    used = []
+    for i in range(n_factors_expected):
+        f = f"F{i+1}"
+        # Default: pick next unused construct in order
+        remaining = [c for c in construct_names if c not in used]
+        default_idx = 0
+        # Restore from session state if exists
+        saved = st.session_state.get(f"efa_fname_{f}")
+        if saved and saved in construct_names:
+            default_idx = construct_names.index(saved)
+
+        selected = st.selectbox(
+            f"Factor {i+1} = ",
+            options=construct_names,
+            index=default_idx,
+            key=f"efa_fname_{f}"
+        )
+        factor_names[f] = selected
+        used.append(selected)
+
+    # Check for duplicates
+    if len(set(factor_names.values())) < len(factor_names):
+        badge("warning", "Duplicate construct names detected. Each factor should map to a unique construct.")
+    else:
+        badge("ok", "Factor names are consistent with Data Input constructs.")
+
+    st.session_state["efa_factor_names"] = factor_names
+    return factor_names
 
 
 def render_factor_naming(loadings_mat, n_factors):
-    st.subheader("Step 5: Factor Naming")
-    st.markdown(
-        "Names are auto-filled based on which construct's items load highest on each factor. "
-        "You can edit if needed — but keep names consistent with Data Input to avoid errors."
-    )
+    """
+    Step shown AFTER Run EFA — displays factor loading table with assigned names.
+    Names already set in render_factor_naming_setup().
+    """
+    st.subheader("Step 5: Factor Assignment Summary")
+    st.markdown("Factor names assigned in Step 3b, shown here with loading results.")
 
-    factor_cols = [f"F{i+1}" for i in range(n_factors) if f"F{i+1}" in loadings_mat.columns]
+    factor_cols  = [f"F{i+1}" for i in range(n_factors) if f"F{i+1}" in loadings_mat.columns]
+    factor_names = st.session_state.get("efa_factor_names", {})
 
-    # Auto-assign names from Data Input constructs
-    constructs  = st.session_state.get("constructs", {})
-    auto_names  = _auto_name_factors(loadings_mat, constructs) if constructs else {}
-
-    factor_names = {}
     for f in factor_cols:
-        default_name = auto_names.get(f, f"Factor{f[1:]}")
-        top_items    = loadings_mat[f].abs().nlargest(5).index.tolist()
-        c1, c2       = st.columns([1, 2])
-        with c1:
-            name = st.text_input(
-                f"Name for {f}",
-                value=default_name,
-                key=f"efa_fname_{f}"
-            )
-            factor_names[f] = name
-            if name not in constructs:
-                badge("warning",
-                    f"Name '{name}' does not match any construct defined in Data Input. "
-                    "This may cause errors in SEM."
-                )
-        with c2:
-            st.markdown(f"Top items loading on {f}:")
-            for item in top_items:
-                val = loadings_mat.loc[item, f]
-                st.markdown(f"  - {item}: lambda = `{val:.3f}`")
+        name      = factor_names.get(f, f)
+        top_items = loadings_mat[f].abs().nlargest(5).index.tolist()
+        st.markdown(f"**{f} → {name}:** top items: " +
+                    ", ".join([f"{item} (λ={loadings_mat.loc[item,f]:.3f})" for item in top_items]))
 
-    st.session_state["efa_factor_names"] = factor_names
     return factor_names
 
 
@@ -458,9 +460,15 @@ def render_efa():
         st.markdown("*Standard for SEM/CFA preparation (Hair et al., 2019)*")
 
     badge("ok",
-        "Recommendation: Use **PAF with oblimin rotation** for social science. "
+        "Recommendation: Use PAF with oblimin rotation for social science. "
         "Oblique rotation allows factors to correlate, which is realistic in behavioral research."
     )
+
+    st.markdown("---")
+    # Factor naming BEFORE Run EFA - ensures consistency
+    n_factors_setup = st.session_state.get("efa_n_factors_widget", 2)
+    factor_names_setup = render_factor_naming_setup(int(n_factors_setup))
+    st.markdown("---")
 
     if st.button("Run EFA via R/psych", type="primary", key="run_efa_btn"):
         try:
