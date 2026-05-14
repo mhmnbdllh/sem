@@ -353,6 +353,7 @@ def render_correlation_matrix(df, indicator_cols):
         plot_bgcolor="#ffffff",
         paper_bgcolor="#ffffff",
     )
+    fig.update_traces(showscale=False)
     st.plotly_chart(fig, use_container_width=True)
 
     with st.expander("Correlation Table (lower triangle)"):
