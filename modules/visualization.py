@@ -297,6 +297,7 @@ def render_path_diagram():
         '</div>',
         unsafe_allow_html=True,
     )
+    st.caption("Note: Path labels show standardized beta. * p < .05; ** p < .01; *** p < .001; ns = not significant.")
     badge("ok",
         "Tip: Hover over nodes and arrows for details. "
         "Use the camera icon in the top-right to save as PNG."
@@ -417,7 +418,7 @@ def render_effect_sizes():
         paper_bgcolor="#ffffff",
     )
     st.plotly_chart(fig, use_container_width=True)
-    st.caption("Green = significant positive | Red = significant negative | Gray = non-significant. * p < .05")
+    st.caption("Note: * p < .05; ** p < .01; *** p < .001; ns = not significant. Green = significant positive | Red = significant negative | Gray = non-significant.")
 
 
 def render_construct_correlations():
