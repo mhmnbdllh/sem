@@ -153,8 +153,7 @@ def render_descriptive_table(df, indicator_cols):
                     plot_bgcolor="#ffffff",
                     paper_bgcolor="#ffffff",
                 )
-                fig.update_coloraxes(showscale=False)
-        st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True)
 
 
 def render_missing_analysis(df, indicator_cols):
@@ -353,7 +352,6 @@ def render_correlation_matrix(df, indicator_cols):
         plot_bgcolor="#ffffff",
         paper_bgcolor="#ffffff",
     )
-    fig.update_traces(showscale=False)
     st.plotly_chart(fig, use_container_width=True)
 
     with st.expander("Correlation Table (lower triangle)"):
