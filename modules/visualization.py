@@ -156,7 +156,7 @@ def build_path_diagram(constructs, structural_paths,
         ))
 
         # Arrowhead - stop before node center to avoid covering text
-        dx, dy = ox - px_, oy - py
+        dx, dy = ox - px_, oy - py_
         dist = math.sqrt(dx**2 + dy**2)
         if dist > 0:
             ux, uy = dx/dist, dy/dist
