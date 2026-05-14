@@ -285,7 +285,6 @@ def render_loadings_table(result, item_names, n_factors):
             plot_bgcolor="#ffffff",
             paper_bgcolor="#ffffff",
         )
-        fig.update_traces(showscale=False)
         st.plotly_chart(fig, use_container_width=True)
 
     # Item-by-item interpretation
