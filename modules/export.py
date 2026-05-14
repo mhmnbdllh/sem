@@ -931,20 +931,49 @@ def generate_html_report():
     body = "\n".join(sections)
 
     # TOC
+    # TOC items with markers: (title, has_data)
     toc_items = [
-        "Study Overview", "Model Specification", "Descriptive Statistics",
-        "EFA Results", "CFA Model Fit", "Factor Loadings",
-        "Reliability and Validity", "SEM Model Fit", "Structural Paths",
-        "Explained Variance", "Mediation Analysis", "Moderation Analysis",
-        "Measurement Invariance", "Model Comparison", "Path Diagram",
-        "Checklist", "APA Narrative", "References",
+        ("Study Overview",         bool(df is not None)),
+        ("Model Specification",    bool(constructs)),
+        ("Descriptive Statistics", bool(df is not None and indicator_cols)),
+        ("EFA Results",            bool(efa_result and "error" not in efa_result)),
+        ("CFA Model Fit",          bool(cfa_fit)),
+        ("Factor Loadings",        bool(cfa_loadings)),
+        ("Reliability and Validity", bool(metrics)),
+        ("SEM Model Fit",          bool(sem_fit)),
+        ("Structural Paths",       bool(sem_paths)),
+        ("Explained Variance R2",  bool(sem_r2)),
+        ("Mediation Analysis",     bool(med_results)),
+        ("Moderation Analysis",    bool(mod_results)),
+        ("Measurement Invariance", bool(inv_results)),
+        ("Model Comparison",       bool(comp_results)),
+        ("Path Diagram",           bool(constructs and struct_paths)),
+        ("Methodological Checklist", True),
+        ("APA Narrative",          True),
+        ("References",             True),
     ]
     toc_html = '<div style="background:#f8fafc;border:1px solid #dde3ea;border-radius:8px;padding:16px 20px;margin:20px 0">'
     toc_html += '<h3 style="color:#2E86AB;margin:0 0 10px 0;font-size:1rem">Table of Contents</h3>'
-    toc_html += '<ol style="margin:0;padding-left:20px;column-count:2;column-gap:20px;font-size:0.85rem">'
-    for i, title in enumerate(toc_items, 1):
-        toc_html += f'<li style="margin:3px 0">{i}. {title}</li>'
-    toc_html += '</ol></div>'
+    toc_html += '<p style="font-size:0.78rem;color:#888;margin:0 0 10px 0">&#9989; = completed &nbsp; &#9744; = not run</p>'
+    toc_html += '<table style="border-collapse:collapse;width:100%;font-size:0.85rem">'
+    for i, (title, has_data) in enumerate(toc_items, 1):
+        marker = "&#9989;" if has_data else "&#9744;"
+        color  = "#1a1a1a" if has_data else "#aaaaaa"
+        bg     = "#ffffff" if i % 2 == 0 else "#f8fafc"
+        col    = "left" if i <= 9 else "right"
+        toc_html += (
+            f'<tr style="background:{bg}">'
+            f'<td style="padding:4px 8px;width:50%;color:{color}">'
+            f'{marker} {i}. {title}</td>'
+        )
+        if i % 2 == 1 and i < len(toc_items):
+            # Will be closed by the even row
+            pass
+        if i % 2 == 0:
+            toc_html += '</tr>'
+    if len(toc_items) % 2 == 1:
+        toc_html += '<td style="padding:4px 8px"></td></tr>'
+    toc_html += '</table></div>'
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
