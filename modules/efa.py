@@ -306,49 +306,72 @@ def render_loadings_table(result, item_names, n_factors):
 
 
 def render_factor_naming_setup(n_factors_expected):
-    """
-    Step shown BEFORE Run EFA — user assigns construct names to factor slots.
-    Uses selectbox with construct names from Data Input.
-    """
+    constructs      = st.session_state.get("constructs", {})
+    construct_names = list(constructs.keys())
+
     st.subheader("Step 3b: Assign Construct Names to Factors")
     st.markdown(
-        "Before running EFA, assign which **construct** corresponds to each factor. "
-        "Use the same names as defined in Data Input to ensure consistency across all modules."
+        "Assign a name to each factor before running EFA. "
+        "Use the same names as Data Input to ensure consistency across all modules."
     )
-
-    constructs     = st.session_state.get("constructs", {})
-    construct_names = list(constructs.keys())
 
     if not construct_names:
         st.warning("No constructs defined in Data Input. Please complete Data Input first.")
         return {}
 
+    # Reminder box showing constructs from Data Input
+    reminder_parts = ["Constructs from Data Input (for reference):"]
+    for cname, items in constructs.items():
+        reminder_parts.append(f"  - {cname}: {', '.join(items)}")
+    st.info("\n".join(reminder_parts))
+    st.markdown("---")
+
     factor_names = {}
-    used = []
+    OPTIONS      = construct_names + ["[ Custom name... ]"]
+
     for i in range(n_factors_expected):
-        f = f"F{i+1}"
-        # Default: pick next unused construct in order
-        remaining = [c for c in construct_names if c not in used]
-        default_idx = 0
-        # Restore from session state if exists
-        saved = st.session_state.get(f"efa_fname_{f}")
+        f     = f"F{i+1}"
+        saved = st.session_state.get(f"efa_fname_{f}", "")
+
         if saved and saved in construct_names:
             default_idx = construct_names.index(saved)
+        else:
+            default_idx = min(i, len(construct_names) - 1)
 
-        selected = st.selectbox(
-            f"Factor {i+1} = ",
-            options=construct_names,
-            index=default_idx,
-            key=f"efa_fname_{f}"
-        )
-        factor_names[f] = selected
-        used.append(selected)
+        c1, c2 = st.columns([2, 2])
+        with c1:
+            selected = st.selectbox(
+                f"Factor {i+1} name",
+                options=OPTIONS,
+                index=default_idx,
+                key=f"efa_sel_{f}",
+            )
+        with c2:
+            if selected == "[ Custom name... ]":
+                prev_custom = saved if saved and saved not in construct_names else ""
+                custom = st.text_input(
+                    f"Type name for Factor {i+1}",
+                    value=prev_custom,
+                    key=f"efa_custom_{f}",
+                    placeholder="e.g., NewFactor",
+                )
+                name = custom.strip() if custom.strip() else f"Factor{i+1}"
+            else:
+                name = selected
+                items_list = constructs.get(name, [])
+                if items_list:
+                    st.markdown(f"Items: {', '.join(items_list)}")
 
-    # Check for duplicates
-    if len(set(factor_names.values())) < len(factor_names):
-        badge("warning", "Duplicate construct names detected. Each factor should map to a unique construct.")
+        factor_names[f] = name
+        st.session_state[f"efa_fname_{f}"] = name
+
+    values = list(factor_names.values())
+    if len(set(values)) < len(values):
+        badge("warning", "Duplicate names detected. Each factor should have a unique name.")
+    elif all(v in construct_names for v in values):
+        badge("ok", "All factor names match Data Input constructs. Consistency ensured.")
     else:
-        badge("ok", "Factor names are consistent with Data Input constructs.")
+        badge("ok", "Factor names set. Ensure custom names are consistent with structural paths.")
 
     st.session_state["efa_factor_names"] = factor_names
     return factor_names
