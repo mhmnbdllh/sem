@@ -477,12 +477,14 @@ def render_construct_correlations():
         text_auto=".3f",
         title="Inter-Construct Correlation Matrix",
         aspect="auto",
+        color_continuous_midpoint=0,
     )
     fig.update_layout(
         height=max(320, len(constructs)*70),
         font_color="#1a1a1a",
         plot_bgcolor="#ffffff",
         paper_bgcolor="#ffffff",
+        coloraxis_colorbar=dict(thickness=10, len=0.75, title="", tickfont=dict(size=9)),
     )
     st.plotly_chart(fig, use_container_width=True)
     st.caption(
