@@ -351,6 +351,7 @@ def render_correlation_matrix(df, indicator_cols):
         font_color="#1a1a1a",
         plot_bgcolor="#ffffff",
         paper_bgcolor="#ffffff",
+        coloraxis_colorbar=dict(thickness=10, len=0.75, title="", tickfont=dict(size=9)),
     )
     st.plotly_chart(fig, use_container_width=True)
 
