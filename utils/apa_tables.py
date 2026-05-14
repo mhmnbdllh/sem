@@ -198,8 +198,8 @@ def reliability_validity_table(metrics: dict) -> pd.DataFrame:
             "CR":           _fmt(cr),
             "McDonald w":   _fmt(omega),
             "AVE":          _fmt(ave),
-            "a>=.70":      "Pass" if alpha and alpha >= CFA["alpha_min"] else "Fail",
-            "CR>=.70":     "Pass" if cr    and cr    >= CFA["cr_min"]    else "Fail",
+            "a>=.70":      "Pass" if alpha is not None and alpha >= CFA["alpha_min"] else "Fail",
+            "CR>=.70":     "Pass" if cr is not None and cr    >= CFA["cr_min"]    else "Fail",
             "AVE>=.50":    "Pass" if ave   and ave   >= CFA["ave_min"]   else "Fail",
         })
     return pd.DataFrame(rows)
