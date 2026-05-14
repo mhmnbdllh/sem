@@ -1021,9 +1021,9 @@ def generate_html_report():
 {toc_html}
 {body}
 <hr style="border:none;border-top:1px solid #dde3ea;margin:40px 0 16px">
-<p style="color:#aaa;font-size:0.75rem;text-align:center">
-  SEM Studio &mdash; Open Source SEM Analysis Suite &mdash;
-  Powered by R/lavaan &mdash; Generated {now}
+<p style="color:#aaa;font-size:0.95rem;text-align:center">
+  SEM Studio &mdash; Open Source SEM Studio App &mdash;
+  Scripted by Dr. Muhaimin Abdullah, S.Pd., M.Pd. &mdash; Generated {now}
 </p>
 </body>
 </html>"""
