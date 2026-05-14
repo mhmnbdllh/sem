@@ -234,8 +234,8 @@ def render_sidebar():
             <div style="font-size:1.3rem;font-weight:800;color:#1a6fa8">
                 SEM Studio
             </div>
-            <div style="font-size:0.7rem;color:#888;margin-top:2px">
-                Level 100 · R/lavaan Backend
+            <div style="font-size:1.2rem;color:#888;margin-top:2px">
+                Scripted by Dr. Muhaimin Abdullah, S.Pd., M.Pd.
             </div>
         </div>
         <hr style="margin:8px 0;border-color:#dde3ea"/>
