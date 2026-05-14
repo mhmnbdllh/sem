@@ -415,10 +415,10 @@ def render_reliability(result, constructs, df):
                     ave_val = float(sum_lam2 / denom2) if denom2 > 0 else None
 
         metrics[cname] = {
-            "alpha":   round(float(alpha), 3) if alpha and not np.isnan(alpha) else None,
-            "cr":      round(float(cr), 3)    if cr    else None,
-            "omega":   round(float(cr), 3)    if cr    else None,
-            "ave":     round(float(ave_val), 3) if ave_val else None,
+            "alpha":   round(float(alpha), 3) if alpha is not None and not np.isnan(float(alpha)) else None,
+            "cr":      round(float(cr), 3)    if cr is not None else None,
+            "omega":   round(float(cr), 3)    if cr is not None else None,
+            "ave":     round(float(ave_val), 3) if ave_val is not None else None,
             "n_items": n_items,
             "lambdas": [float(l) for l in lambdas if l is not None],
         }
