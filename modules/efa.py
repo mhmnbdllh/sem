@@ -488,8 +488,26 @@ def render_efa():
     )
 
     st.markdown("---")
-    # Factor naming BEFORE Run EFA - ensures consistency
-    n_factors_setup = st.session_state.get("efa_n_factors_widget", 2)
+
+    # Number of factors - BEFORE Run EFA
+    st.subheader("Step 3b: Number of Factors and Construct Names")
+    constructs_preview = st.session_state.get("constructs", {})
+    suggested_default  = len(constructs_preview) if constructs_preview else 2
+
+    n_factors_setup = st.number_input(
+        "How many factors to extract?",
+        min_value=1,
+        max_value=20,
+        value=st.session_state.get("efa_n_factors_widget", suggested_default),
+        step=1,
+        key="efa_n_factors_widget",
+        help="Default = number of constructs defined in Data Input. Adjust if needed."
+    )
+    st.caption(
+        f"Default = {suggested_default} (number of constructs in Data Input). "
+        "You can change this after seeing the scree plot — but that requires running EFA again."
+    )
+
     factor_names_setup = render_factor_naming_setup(int(n_factors_setup))
     st.markdown("---")
 
