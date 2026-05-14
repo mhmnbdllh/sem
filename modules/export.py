@@ -603,6 +603,326 @@ def render_excel_export():
                 badge("excellent", "Excel report ready for download!")
 
 
+def generate_html_report() -> str:
+    """Generate a complete APA-style HTML report of all SEM results."""
+    ss  = st.session_state
+    df  = ss.get("df")
+    n   = len(df) if df is not None else "N/A"
+    constructs   = ss.get("constructs", {})
+    cfa_fit      = ss.get("cfa_fit", {})
+    sem_fit      = ss.get("sem_fit", {})
+    metrics      = ss.get("cfa_metrics", {})
+    sem_paths    = ss.get("sem_paths", [])
+    sem_r2       = ss.get("sem_r2", [])
+    med_results  = ss.get("mediation_results")
+    med_vars     = ss.get("mediation_vars", {})
+    mod_results  = ss.get("moderation_results")
+    mod_vars     = ss.get("moderation_vars", {})
+    inv_results  = ss.get("invariance_results")
+    inv_level    = ss.get("invariance_level", "—")
+    narrative    = generate_apa_narrative()
+    from datetime import datetime
+    now = datetime.now().strftime("%B %d, %Y %H:%M")
+
+    def tbl(headers, rows, caption=""):
+        hdr = "".join(f"<th>{h}</th>" for h in headers)
+        body = ""
+        for i, row in enumerate(rows):
+            bg = "#f8fafc" if i % 2 == 0 else "#ffffff"
+            cells = "".join(f'<td style="padding:7px 12px;border-bottom:1px solid #eee">{v}</td>' for v in row)
+            body += f'<tr style="background:{bg}">{cells}</tr>'
+        cap = f'<caption style="text-align:left;font-size:0.82rem;color:#666;padding:4px 0">{caption}</caption>' if caption else ""
+        return (
+            f'<table style="width:100%;border-collapse:collapse;margin:12px 0;font-size:0.9rem">'
+            f'{cap}'
+            f'<thead><tr style="background:#2E86AB;color:white">{hdr}</tr></thead>'
+            f'<tbody>{body}</tbody></table>'
+        )
+
+    def section(title, content, color="#2E86AB"):
+        return (
+            f'<div style="margin:28px 0">'
+            f'<h2 style="color:{color};border-bottom:2px solid {color};padding-bottom:6px;margin-bottom:14px">{title}</h2>'
+            f'{content}'
+            f'</div>'
+        )
+
+    def badge_html(level, msg):
+        colors = {"excellent":"#1a7a4a","ok":"#1a6fa8","warning":"#b7770d","critical":"#c0392b"}
+        c = colors.get(level, "#555")
+        return f'<div style="background:{c}18;border-left:4px solid {c};padding:10px 14px;border-radius:4px;margin:8px 0;color:#1a1a1a">{msg}</div>'
+
+    # ── Build sections ─────────────────────────────────────────
+
+    # 1. Overview
+    overview_rows = [
+        ["Sample Size (n)", str(n)],
+        ["Number of Constructs", str(len(constructs))],
+        ["Total Indicators", str(sum(len(v) for v in constructs.values()))],
+        ["Estimator", ss.get("recommended_estimator", "N/A")],
+        ["Generated", now],
+    ]
+    s1 = section("1. Overview", tbl(["Item", "Value"], overview_rows))
+
+    # 2. Constructs
+    const_rows = [[c, ", ".join(items), str(len(items))] for c, items in constructs.items()]
+    s2 = section("2. Measurement Model Specification",
+        tbl(["Construct", "Indicators", "n Items"], const_rows))
+
+    # 3. CFA Fit
+    fit_rows = []
+    fit_keys = [
+        ("chi2",  "chi2",    "Non-significant preferred"),
+        ("df",    "df",      "Degrees of freedom"),
+        ("pvalue","p",       "p-value"),
+        ("rmsea", "RMSEA",   "<=.05 excellent; <=.06 good; <=.08 acceptable"),
+        ("cfi",   "CFI",     ">=.97 excellent; >=.95 good; >=.90 acceptable"),
+        ("tli",   "TLI",     ">=.95 good; >=.90 acceptable"),
+        ("srmr",  "SRMR",    "<=.05 good; <=.08 acceptable"),
+        ("aic",   "AIC",     "Lower is better"),
+        ("bic",   "BIC",     "Lower is better"),
+    ]
+    for key, label, criterion in fit_keys:
+        val = cfa_fit.get(key)
+        if val is not None:
+            try:
+                fit_rows.append([label, f"{float(val):.3f}", criterion])
+            except: pass
+    s3 = section("3. CFA Model Fit", tbl(["Index", "Value", "Criterion"], fit_rows,
+        "Note: chi2/df <= 2.0 = good; <= 5.0 = acceptable (Kline, 2016). RMSEA, CFI, TLI, SRMR per Hu & Bentler (1999)."))
+
+    # 4. Factor Loadings
+    cfa_loadings = ss.get("cfa_loadings", {})
+    load_rows = []
+    for cname, items_dict in cfa_loadings.items():
+        for item, lam in items_dict.items():
+            try:
+                lam_f = float(lam)
+                status = "Strong" if abs(lam_f) >= 0.70 else "Acceptable" if abs(lam_f) >= 0.50 else "Weak"
+                load_rows.append([cname, item, f"{lam_f:.3f}", status])
+            except: pass
+    s4 = section("4. Factor Loadings", tbl(
+        ["Construct", "Item", "Std. Loading (lambda)", "Status"],
+        load_rows,
+        "Note: lambda >= .70 = strong; >= .50 = acceptable; < .50 = weak (Hair et al., 2019)."
+    ))
+
+    # 5. Reliability & Validity
+    rel_rows = []
+    for cname, m in metrics.items():
+        rel_rows.append([
+            cname,
+            str(m.get("n_items", "—")),
+            _fmt(m.get("alpha")),
+            _fmt(m.get("cr")),
+            _fmt(m.get("ave")),
+            "Pass" if (m.get("alpha") or 0) >= 0.70 else "Fail",
+            "Pass" if (m.get("cr")    or 0) >= 0.70 else "Fail",
+            "Pass" if (m.get("ave")   or 0) >= 0.50 else "Fail",
+        ])
+    s5 = section("5. Reliability and Validity", tbl(
+        ["Construct", "Items", "Cronbach alpha", "CR", "AVE", "alpha>=.70", "CR>=.70", "AVE>=.50"],
+        rel_rows,
+        "Note: CR = Composite Reliability; AVE = Average Variance Extracted. Criteria per Fornell & Larcker (1981); Hair et al. (2019)."
+    ))
+
+    # 6. SEM Fit
+    sem_fit_rows = []
+    for key, label, criterion in fit_keys:
+        val = sem_fit.get(key)
+        if val is not None:
+            try:
+                sem_fit_rows.append([label, f"{float(val):.3f}", criterion])
+            except: pass
+    s6 = section("6. SEM Model Fit", tbl(["Index", "Value", "Criterion"], sem_fit_rows,
+        "Note: Same criteria as CFA fit above."))
+
+    # 7. Structural Paths
+    path_rows = []
+    for i, p in enumerate(sem_paths):
+        pval = _safe_float(p.get("p"))
+        beta = _safe_float(p.get("beta"))
+        path_rows.append([
+            f"H{i+1}",
+            f"{p.get('predictor','?')} -> {p.get('outcome','?')}",
+            _fmt(beta),
+            _fmt(_safe_float(p.get("se"))),
+            _fmt(_safe_float(p.get("z"))),
+            _fmt(pval),
+            _stars(pval),
+            "Supported" if pval is not None and pval < 0.05 else "Not Supported",
+        ])
+    s7 = section("7. Structural Paths", tbl(
+        ["H", "Path", "Beta", "SE", "z", "p", "Sig.", "Decision"],
+        path_rows,
+        "Note: * p < .05; ** p < .01; *** p < .001. Beta = standardized path coefficient."
+    ))
+
+    # 8. R-squared
+    r2_rows = []
+    for row in sem_r2:
+        if isinstance(row, dict):
+            r2_rows.append([row.get("Construct","—"), _fmt(row.get("R2")), row.get("R2 (%)","—")])
+    s8 = section("8. Explained Variance (R2)", tbl(
+        ["Construct", "R2", "R2 (%)"],
+        r2_rows,
+        "Note: R2 >= .26 = substantial; >= .13 = moderate; >= .02 = weak (Cohen, 1988)."
+    )) if r2_rows else ""
+
+    # 9. Mediation
+    s9 = ""
+    if med_results and isinstance(med_results, dict):
+        x = med_vars.get("x","X"); m_v = med_vars.get("m","M"); y = med_vars.get("y","Y")
+        med_rows = []
+        for key, label in [
+            ("a_path", f"{x} -> {m_v} (a path)"),
+            ("b_path", f"{m_v} -> {y} | {x} (b path)"),
+            ("cp_path",f"{x} -> {y} direct (c prime)"),
+            ("total",  f"{x} -> {y} total (c)"),
+            ("indirect",f"Indirect effect (a x b)"),
+        ]:
+            d = med_results.get(key, {})
+            if not isinstance(d, dict): continue
+            est   = _safe_float(d.get("est"))
+            ci_lo = _safe_float(d.get("ci_lo"))
+            ci_hi = _safe_float(d.get("ci_hi"))
+            pval  = _safe_float(d.get("p"))
+            ci_str = f"[{ci_lo:.4f}, {ci_hi:.4f}]" if ci_lo is not None and ci_hi is not None else "—"
+            if key == "indirect":
+                sig = "Significant" if (ci_lo is not None and ci_hi is not None and not (ci_lo <= 0 <= ci_hi)) else "Not Significant"
+            else:
+                sig = _stars(pval) if pval is not None else "—"
+            med_rows.append([label, _fmt(est), ci_str, sig])
+        s9 = section("9. Mediation Analysis", tbl(
+            ["Effect", "Beta", "95% BCa CI", "Sig."],
+            med_rows,
+            f"Note: Bootstrap mediation via R/lavaan. X={x}, M={m_v}, Y={y}. Significance: CI not containing zero."
+        ))
+
+    # 10. Moderation
+    s10 = ""
+    if mod_results and isinstance(mod_results, dict):
+        x = mod_vars.get("x","X"); w = mod_vars.get("w","W"); y = mod_vars.get("y","Y")
+        b3   = _safe_float(mod_results.get("b3"))
+        b3_p = _safe_float(mod_results.get("b3_p"))
+        r2_2 = _safe_float(mod_results.get("r2_2"))
+        dr2  = _safe_float(mod_results.get("delta_r2"))
+        mod_rows = [
+            [f"{x} (X)",          _fmt(_safe_float(mod_results.get("b1"))), _fmt(_safe_float(mod_results.get("b1_se"))), _fmt(_safe_float(mod_results.get("b1_p"))), _stars(_safe_float(mod_results.get("b1_p")))],
+            [f"{w} (W)",          _fmt(_safe_float(mod_results.get("b2"))), _fmt(_safe_float(mod_results.get("b2_se"))), _fmt(_safe_float(mod_results.get("b2_p"))), _stars(_safe_float(mod_results.get("b2_p")))],
+            [f"{x} x {w} (Int.)",_fmt(b3),                                  _fmt(_safe_float(mod_results.get("b3_se"))), _fmt(b3_p),                                  _stars(b3_p)],
+        ]
+        mod_content = tbl(["Term","Beta","SE","p","Sig."], mod_rows,
+            f"Note: Variables mean-centered. Interaction significant if p < .05. X={x}, W={w}, Y={y}.")
+        mod_content += f"<p>Model R2 = {_fmt(r2_2)}, Delta R2 = {_fmt(dr2)}</p>"
+        s10 = section("10. Moderation Analysis", mod_content)
+
+    # 11. Invariance
+    s11 = ""
+    if inv_results and isinstance(inv_results, dict) and "error" not in inv_results:
+        inv_rows = []
+        for name, label in [("configural","Configural"),("metric","Metric"),("scalar","Scalar")]:
+            fit_d = inv_results.get(name, {})
+            if isinstance(fit_d, dict):
+                inv_rows.append([
+                    label,
+                    _fmt(fit_d.get("cfi")),
+                    _fmt(fit_d.get("rmsea")),
+                    _fmt(fit_d.get("srmr")),
+                ])
+        diff_rows = []
+        for key, label in [("diff_metric","Metric vs Configural"),("diff_scalar","Scalar vs Metric")]:
+            d = inv_results.get(key, {})
+            if isinstance(d, dict):
+                dcfi = _safe_float(d.get("delta_cfi"))
+                diff_rows.append([
+                    label,
+                    _fmt(d.get("delta_chi2")),
+                    _fmt(dcfi),
+                    _fmt(d.get("delta_rmsea")),
+                    "Supported" if dcfi is not None and dcfi >= -0.010 else "Not Supported",
+                ])
+        inv_content  = tbl(["Model","CFI","RMSEA","SRMR"], inv_rows)
+        inv_content += tbl(["Comparison","Delta chi2","Delta CFI","Delta RMSEA","Invariance"],
+            diff_rows,
+            "Note: Delta CFI >= -.010 supports invariance (Cheung & Rensvold, 2002). "
+            f"Highest level achieved: {inv_level}.")
+        s11 = section("11. Measurement Invariance", inv_content)
+
+    # 12. APA Narrative
+    narrative_html = narrative.replace("\n", "<br>").replace("=","&#61;")
+    s12 = section("12. APA Results Narrative",
+        f'<pre style="background:#f8fafc;padding:16px;border-radius:6px;'
+        f'font-family:Georgia,serif;font-size:0.88rem;line-height:1.7;'
+        f'white-space:pre-wrap;border:1px solid #dde3ea">{narrative}</pre>',
+        color="#555"
+    )
+
+    # ── Assemble full HTML ────────────────────────────────────
+    body = s1 + s2 + s3 + s4 + s5 + s6 + s7 + s8 + s9 + s10 + s11 + s12
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SEM Studio Report</title>
+<style>
+  body {{ font-family: 'Segoe UI', Arial, sans-serif; max-width: 960px; margin: 40px auto;
+         padding: 0 24px; color: #1a1a1a; background: #fff; line-height: 1.6; }}
+  h1   {{ color: #2E86AB; border-bottom: 3px solid #2E86AB; padding-bottom: 10px; }}
+  h2   {{ margin-top: 32px; }}
+  table {{ page-break-inside: avoid; }}
+  th   {{ padding: 8px 12px; text-align: left; }}
+  td   {{ vertical-align: top; }}
+  @media print {{
+    body {{ margin: 20px; }}
+    .no-print {{ display: none; }}
+  }}
+</style>
+</head>
+<body>
+<h1>SEM Studio Analysis Report</h1>
+<p style="color:#888;font-size:0.85rem">Generated: {now} &nbsp;|&nbsp; R/lavaan Backend &nbsp;|&nbsp; n = {n}</p>
+<hr style="border-color:#dde3ea">
+{body}
+<hr style="border-color:#dde3ea;margin-top:40px">
+<p style="color:#aaa;font-size:0.78rem;text-align:center">
+  SEM Studio &mdash; Powered by R/lavaan &mdash; 
+  References: Hair et al. (2019); Kline (2016); Hu &amp; Bentler (1999); Rosseel (2012)
+</p>
+</body>
+</html>"""
+
+    return html
+
+
+def render_html_export():
+    st.subheader("Export HTML Report")
+    st.markdown(
+        "Download a complete, publication-ready HTML report. "
+        "Open in browser, print to PDF, or copy-paste into Word."
+    )
+
+    if st.button("Generate HTML Report", type="primary", key="export_html_btn"):
+        with st.spinner("Generating HTML report..."):
+            try:
+                html = generate_html_report()
+                from datetime import datetime
+                fname = f"SEM_Studio_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.html"
+                st.download_button(
+                    label="Download HTML Report",
+                    data=html.encode("utf-8"),
+                    file_name=fname,
+                    mime="text/html",
+                    key="dl_html_btn"
+                )
+                badge("excellent", "HTML report ready! Open in browser to view, print to PDF, or copy-paste into Word.")
+            except Exception as e:
+                st.error(f"HTML generation failed: {str(e)}")
+
+
+
 # ── SECTION 4: QUICK TEXT ────────────────────────────────────────
 
 def render_text_export():
@@ -662,9 +982,10 @@ def render_export():
         st.warning("Please complete Data Input and Model Setup first.")
         return
 
-    tab1, tab2, tab3, tab4 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "Checklist",
         "APA Narrative",
+        "HTML Report",
         "Excel Export",
         "Quick Text",
     ])
@@ -674,6 +995,8 @@ def render_export():
     with tab2:
         render_apa_narrative()
     with tab3:
-        render_excel_export()
+        render_html_export()
     with tab4:
+        render_excel_export()
+    with tab5:
         render_text_export()
