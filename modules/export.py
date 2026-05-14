@@ -401,7 +401,7 @@ def generate_excel():
     buf = io.BytesIO()
 
     try:
-        with pd.ExcelWriter(buf, engine="openpyxl", engine_kwargs={"strings_to_formulas": False, "strings_to_urls": False}) as writer:
+        with pd.ExcelWriter(buf, engine="openpyxl") as writer:
             df         = ss.get("df")
             constructs = ss.get("constructs", {})
             assignments= ss.get("assignments", {})
