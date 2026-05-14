@@ -234,7 +234,7 @@ def render_sidebar():
             <div style="font-size:1.3rem;font-weight:800;color:#1a6fa8">
                 SEM Studio
             </div>
-            <div style="font-size:1.2rem;color:#888;margin-top:2px">
+            <div style="font-size:0.8rem;color:#888;margin-top:2px">
                 Scripted by Dr. Muhaimin Abdullah, S.Pd., M.Pd.
             </div>
         </div>
@@ -326,7 +326,7 @@ def render_home():
             A complete, methodologically rigorous suite for
             <strong>Structural Equation Modeling</strong> and
             <strong>Confirmatory Factor Analysis</strong>.
-            Powered by <strong>R/lavaan</strong> — the gold standard for SEM.
+            Scripted by <strong>Dr. Muhaimin Abdullah, S.Pd., M.Pd.</strong> - SEM for Social Science.
         </p>
     </div>
     """, unsafe_allow_html=True)
