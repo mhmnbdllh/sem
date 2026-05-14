@@ -479,7 +479,6 @@ def render_construct_correlations():
         aspect="auto",
         color_continuous_midpoint=0,
     )
-    fig.update_coloraxes(showscale=False)
     fig.update_layout(
         height=max(320, len(constructs)*70),
         font_color="#1a1a1a",
