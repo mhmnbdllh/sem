@@ -51,7 +51,7 @@ def render_factorability(result):
     c2.metric("Bartlett's chi2",   f"{float(bart_chi2):.3f}" if bart_chi2 else "N/A")
     c3.metric("Bartlett's p-value","< .001" if bart_p is not None and float(bart_p) < 0.001 else f"{float(bart_p):.4f}" if bart_p is not None else "N/A")
 
-    if kmo:
+    if kmo is not None:
         r = interpret_kmo(kmo)
         badge(r["level"], r["message"])
     if bart_p is not None:
@@ -87,7 +87,7 @@ def render_factorability(result):
                 use_container_width=True, hide_index=True
             )
 
-    factorable = (kmo is not None and kmo >= 0.60) and (bart_p is not None and float(bart_p) < 0.05)
+    factorable = (kmo is not None and float(kmo) >= 0.60) and (bart_p is not None and float(bart_p) < 0.05)
     return factorable
 
 
@@ -307,7 +307,7 @@ def render_factor_naming_setup(n_factors_expected):
     constructs      = st.session_state.get("constructs", {})
     construct_names = list(constructs.keys())
 
-    st.subheader("Step 2b: Assign Construct Names to Factors")
+    
     st.markdown(
         "Assign a name to each factor before running EFA. "
         "Use the same names as Data Input to ensure consistency across all modules."
