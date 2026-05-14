@@ -281,9 +281,8 @@ def render_loadings_table(result, item_names, n_factors):
         )
         fig.update_layout(
             height=max(200, n_factors * 70),
-        coloraxis_colorbar=dict(thickness=10, len=0.75, title="", tickfont=dict(size=9)),
+            coloraxis_colorbar=dict(thickness=10, len=0.75, title="", tickfont=dict(size=9)),
             font_color="#1a1a1a",
-        coloraxis_colorbar=dict(thickness=12, len=0.8, title=""),
             plot_bgcolor="#ffffff",
             paper_bgcolor="#ffffff",
         )
