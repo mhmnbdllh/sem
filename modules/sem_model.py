@@ -341,15 +341,10 @@ def render_structural_paths(result, structural_paths):
             return "color:#c0392b;font-weight:700"
 
         st.dataframe(
-            apa_df.style.map(color_decision, subset=["Decision"])
-                        .set_properties(**{"color":"#1a1a1a","background-color":"#ffffff"})
-                        .set_table_styles([{
-                            "selector":"th",
-                            "props":[("background-color","#2E86AB"),("color","white"),("font-weight","bold")]
-                        }]),
+            apa_df,
             use_container_width=True, hide_index=True
         )
-        st.caption("Note: * p < .05;  p < .01; * p < .001; dag p < .10")
+        st.caption("Note: * p < .05; ** p < .01; *** p < .001; dag p < .10")
 
     # Hypothesis testing table
     st.markdown("Hypothesis Testing Results:")
