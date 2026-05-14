@@ -128,7 +128,7 @@ def build_path_diagram(constructs, structural_paths,
     # ── Structural paths ────────────────────────────────────────
     for pred, out in structural_paths:
         if pred not in positions or out not in positions: continue
-        px_, py = positions[pred]
+        px_, py_ = positions[pred]
         ox, oy  = positions[out]
 
         p_info = path_dict.get((pred, out), {})
@@ -145,35 +145,60 @@ def build_path_diagram(constructs, structural_paths,
         else:
             color, width, dash, label = "#aaaaaa", 2.0, "solid", f"{pred}->{out}"
 
+        # Line drawn inside arrow section below (shortened to avoid covering nodes)
         fig.add_trace(go.Scatter(
-            x=[px_, ox], y=[py, oy],
+            x=[px_, ox], y=[py_, oy],
             mode="lines",
-            line=dict(color=color, width=width, dash=dash),
+            line=dict(color="rgba(0,0,0,0)", width=0),
             hovertext=f"{pred} --> {out}<br>{label}",
             hoverinfo="text",
             showlegend=False,
         ))
 
-        # Arrowhead annotation
+        # Arrowhead - stop before node center to avoid covering text
         dx, dy = ox - px_, oy - py
         dist = math.sqrt(dx**2 + dy**2)
         if dist > 0:
             ux, uy = dx/dist, dy/dist
-            ax, ay = ox - ux*0.5, oy - uy*0.5
+            # node_offset: arrow tip stops 0.9 units before node center
+            node_offset = 0.9
+            # arrow start: 0.9 units before source node too
+            tip_x   = ox - ux * node_offset
+            tip_y   = oy - uy * node_offset
+            start_x = px_ + ux * node_offset
+            start_y = py_ + uy * node_offset
+            # Draw line from start to just before tip
+            fig.add_trace(go.Scatter(
+                x=[start_x, tip_x], y=[start_y, tip_y],
+                mode="lines",
+                line=dict(color=color, width=width, dash=dash),
+                hoverinfo="skip", showlegend=False,
+            ))
+            # Arrowhead annotation at tip
             fig.add_annotation(
-                x=ox, y=oy, ax=ax, ay=ay,
+                x=tip_x, y=tip_y,
+                ax=tip_x - ux*0.3, ay=tip_y - uy*0.3,
                 xref="x", yref="y", axref="x", ayref="y",
                 arrowhead=2, arrowsize=1.2, arrowwidth=2,
                 arrowcolor=color, showarrow=True, text="",
             )
 
-        # Label at midpoint
-        mx, my = (px_+ox)/2, (py+oy)/2 + 0.2
+        # Label at midpoint - offset perpendicular to path to avoid overlap
+        mx = (px_ + ox) / 2
+        my = (py_ + oy) / 2
+        # Perpendicular offset so label doesn't sit on arrow line
+        if dist > 0:
+            perp_x = -dy/dist * 0.35
+            perp_y =  dx/dist * 0.35
+        else:
+            perp_x, perp_y = 0, 0.35
         fig.add_annotation(
-            x=mx, y=my, text=label, showarrow=False,
+            x=mx + perp_x, y=my + perp_y,
+            text=label, showarrow=False,
             font=dict(size=10, color=color, family="monospace"),
-            bgcolor="rgba(255,255,255,0.9)",
+            bgcolor="rgba(255,255,255,0.92)",
             bordercolor=color, borderwidth=1,
+            borderpad=3,
         )
 
     # ── Construct nodes (ovals) ─────────────────────────────────
