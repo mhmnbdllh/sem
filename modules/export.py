@@ -1,6 +1,6 @@
 """
 export.py - Export & Report Generation Module for SEM Studio.
-Generates APA narrative, Excel workbook, and methodological checklist.
+Generates comprehensive HTML report with interpretations and visualizations.
 """
 import streamlit as st
 import pandas as pd
@@ -17,7 +17,9 @@ COLORS = {
 }
 
 def badge(level, message):
+    import re
     color = COLORS.get(level, "#555555")
+    message = re.sub(r'[*][*](.+?)[*][*]', r'<b>\1</b>', str(message))
     st.markdown(
         f'<div style="background:{color}18;border-left:4px solid {color};'
         f'padding:10px 14px;border-radius:4px;margin:6px 0;'
@@ -47,86 +49,54 @@ def _stars(p):
         if p < 0.001: return "***"
         elif p < 0.01: return "**"
         elif p < 0.05: return "*"
-        elif p < 0.10: return "dag"
+        elif p < 0.10: return "†"
         return ""
     except: return ""
 
 
-# ── SECTION 1: FULL CHECKLIST ────────────────────────────────────
+# ── CHECKLIST ────────────────────────────────────────────────────
 
 def render_full_checklist():
     st.subheader("Methodological Checklist")
-    st.markdown(
-        "This checklist verifies all required methodological steps have been "
-        "completed correctly before reporting results."
-    )
-
     ss = st.session_state
-    df = ss.get("df")
     constructs = ss.get("constructs", {})
 
     checks = {
         "DATA PREPARATION": {
-            "Data uploaded and validated":
-                ss.get("df_ready", False),
-            "Variable roles assigned":
-                bool(ss.get("assignments")),
-            "Constructs defined (>= 3 items each)":
-                all(len(v) >= 3 for v in constructs.values()) if constructs else False,
-            "Structural paths (hypotheses) defined":
-                len(ss.get("structural_paths", [])) > 0,
+            "Data uploaded and validated":           ss.get("df_ready", False),
+            "Variable roles assigned":               bool(ss.get("assignments")),
+            "Constructs defined (>= 3 items each)":  all(len(v) >= 3 for v in constructs.values()) if constructs else False,
+            "Structural paths defined":              len(ss.get("structural_paths", [])) > 0,
         },
         "DESCRIPTIVE AND ASSUMPTION TESTING": {
-            "Descriptive statistics computed":
-                ss.get("descriptive_complete", False),
-            "Multivariate normality tested (Mardia)":
-                "recommended_estimator" in ss,
-            "Estimator selected (ML or MLR)":
-                "recommended_estimator" in ss,
-            "Common method bias assessed (Harman)":
-                ss.get("descriptive_complete", False),
-            "Outlier detection performed":
-                "mv_outliers" in ss,
+            "Descriptive statistics computed":       ss.get("descriptive_complete", False),
+            "Normality tested (Mardia)":             "recommended_estimator" in ss,
+            "Estimator selected (ML or MLR)":        "recommended_estimator" in ss,
+            "Common method bias assessed (Harman)":  ss.get("descriptive_complete", False),
+            "Outlier detection performed":           "mv_outliers" in ss,
         },
         "MEASUREMENT MODEL (CFA)": {
-            "EFA conducted (if instrument unvalidated)":
-                ss.get("efa_complete", False),
-            "CFA model estimated":
-                "cfa_result" in ss,
-            "Model fit assessed (RMSEA, CFI, TLI, SRMR)":
-                bool(ss.get("cfa_fit")),
-            "Factor loadings >= .50":
-                _check_loadings(),
-            "AVE >= .50 (convergent validity)":
-                _check_ave(),
-            "CR >= .70 (composite reliability)":
-                _check_cr(),
-            "Cronbach alpha >= .70":
-                _check_alpha(),
-            "HTMT discriminant validity assessed":
-                "cfa_result" in ss,
+            "EFA conducted (if needed)":             ss.get("efa_complete", False),
+            "CFA model estimated":                   "cfa_result" in ss,
+            "Model fit assessed":                    bool(ss.get("cfa_fit")),
+            "Factor loadings >= .50":                _check_loadings(),
+            "AVE >= .50 (convergent validity)":      _check_ave(),
+            "CR >= .70 (composite reliability)":     _check_cr(),
+            "Cronbach alpha >= .70":                 _check_alpha(),
+            "HTMT discriminant validity assessed":   "cfa_result" in ss,
         },
         "STRUCTURAL MODEL (SEM)": {
-            "Full SEM estimated":
-                "sem_result" in ss,
-            "SEM fit indices adequate":
-                _check_sem_fit(),
-            "Structural paths reported (beta, SE, p)":
-                bool(ss.get("sem_paths")),
-            "R2 reported for endogenous constructs":
-                bool(ss.get("sem_r2")),
-            "Effect sizes (f2) computed":
-                bool(ss.get("sem_paths")),
+            "Full SEM estimated":                    "sem_result" in ss,
+            "SEM fit indices adequate":              _check_sem_fit(),
+            "Structural paths reported":             bool(ss.get("sem_paths")),
+            "R2 reported for endogenous constructs": bool(ss.get("sem_r2")),
+            "Effect sizes (f2) computed":            bool(ss.get("sem_paths")),
         },
-        "ADVANCED ANALYSES (if applicable)": {
-            "Mediation analysis with bootstrap CI":
-                bool(ss.get("mediation_results")),
-            "Moderation analysis (interaction terms)":
-                bool(ss.get("moderation_results")),
-            "Measurement invariance tested":
-                bool(ss.get("invariance_results")),
-            "Model comparison with rival models":
-                bool(ss.get("comparison_results")),
+        "ADVANCED ANALYSES": {
+            "Mediation analysis with bootstrap CI":  bool(ss.get("mediation_results")),
+            "Moderation analysis":                   bool(ss.get("moderation_results")),
+            "Measurement invariance tested":         bool(ss.get("invariance_results")),
+            "Model comparison with rival models":    bool(ss.get("comparison_results")),
         },
     }
 
@@ -134,37 +104,31 @@ def render_full_checklist():
     total_pass   = 0
 
     for section, section_checks in checks.items():
-        st.markdown(f"{section}")
+        st.markdown(f"**{section}**")
         rows = []
         for check, passed in section_checks.items():
-            rows.append({
-                "Check":  check,
-                "Status": "Pass" if passed else "Pending",
-            })
+            rows.append({"Check": check, "Status": "Pass" if passed else "Pending"})
             total_checks += 1
             if passed: total_pass += 1
 
         def color_status(val):
-            if val == "Pass":    return "color:#1a7a4a;font-weight:700"
+            if val == "Pass": return "color:#1a7a4a;font-weight:700"
             return "color:#888888"
 
         df_check = pd.DataFrame(rows)
         st.dataframe(
             df_check.style.map(color_status, subset=["Status"])
                           .set_properties(**{"color":"#1a1a1a","background-color":"#ffffff"})
-                          .set_table_styles([{
-                              "selector":"th",
-                              "props":[("background-color","#2E86AB"),("color","white"),("font-weight","bold")]
-                          }]),
+                          .set_table_styles([{"selector":"th","props":[("background-color","#2E86AB"),("color","white"),("font-weight","bold")]}]),
             use_container_width=True, hide_index=True
         )
 
     pct = total_pass / total_checks if total_checks > 0 else 0
-    st.markdown(f"Overall progress: {total_pass}/{total_checks} checks complete ({pct:.0%})")
+    st.markdown(f"**Overall progress: {total_pass}/{total_checks} checks complete ({pct:.0%})**")
     st.progress(pct)
 
     if pct >= 0.80:
-        badge("excellent", f"{pct:.0%} of methodological steps completed. Ready to export report!")
+        badge("excellent", f"{pct:.0%} of methodological steps completed. Ready to export!")
     elif pct >= 0.50:
         badge("warning", f"{pct:.0%} complete. Consider completing remaining analyses before reporting.")
     else:
@@ -175,10 +139,7 @@ def _check_loadings():
     from utils.thresholds import CFA as CFA_T
     metrics = st.session_state.get("cfa_metrics", {})
     if not metrics: return False
-    return all(
-        min(m.get("lambdas", [0])) >= CFA_T["loading_min"]
-        for m in metrics.values() if m.get("lambdas")
-    )
+    return all(min(m.get("lambdas",[0])) >= CFA_T["loading_min"] for m in metrics.values() if m.get("lambdas"))
 
 def _check_ave():
     from utils.thresholds import CFA as CFA_T
@@ -202,13 +163,11 @@ def _check_sem_fit():
     from utils.thresholds import FIT
     fit = st.session_state.get("sem_fit", {})
     if not fit: return False
-    return (
-        (fit.get("rmsea") or 999) <= FIT["rmsea_acceptable"] and
-        (fit.get("cfi")   or 0)   >= FIT["cfi_acceptable"]
-    )
+    return ((fit.get("rmsea") or 999) <= FIT["rmsea_acceptable"] and
+            (fit.get("cfi")   or 0)   >= FIT["cfi_acceptable"])
 
 
-# ── SECTION 2: APA NARRATIVE ─────────────────────────────────────
+# ── APA NARRATIVE ─────────────────────────────────────────────────
 
 def generate_apa_narrative():
     ss  = st.session_state
@@ -226,32 +185,24 @@ def generate_apa_narrative():
 
     lines = []
     lines.append("=" * 70)
-    lines.append("SEM STUDIO — APA RESULTS SECTION")
+    lines.append("SEM STUDIO - APA RESULTS SECTION")
     lines.append(f"Generated: {now}")
     lines.append("=" * 70)
     lines.append("")
-
-    # Sample and method
     lines.append("SAMPLE AND METHOD")
     lines.append("-" * 40)
     lines.append(
         f"The analysis was conducted on a sample of N = {n} participants. "
-        f"{est} estimation was used based on Mardia's multivariate normality assessment. "
+        f"{est} estimation was used based on Mardia multivariate normality assessment. "
         f"All analyses were performed using SEM Studio (R/lavaan; Rosseel, 2012)."
     )
     lines.append("")
-
-    # Measurement model
     lines.append("MEASUREMENT MODEL (CFA)")
     lines.append("-" * 40)
     if constructs:
         n_c = len(constructs)
         n_i = sum(len(v) for v in constructs.values())
-        lines.append(
-            f"A confirmatory factor analysis (CFA) was conducted with {n_c} "
-            f"latent constructs and {n_i} observed indicators."
-        )
-
+        lines.append(f"A confirmatory factor analysis (CFA) was conducted with {n_c} latent constructs and {n_i} observed indicators.")
     if cfa_fit:
         rmsea = _safe_float(cfa_fit.get("rmsea"))
         cfi   = _safe_float(cfa_fit.get("cfi"))
@@ -260,26 +211,18 @@ def generate_apa_narrative():
         chi2  = _safe_float(cfa_fit.get("chi2"))
         df_   = _safe_float(cfa_fit.get("df"))
         p_    = _safe_float(cfa_fit.get("p"))
-
-        fit_parts = []
-        if rmsea: fit_parts.append(f"RMSEA = {rmsea:.3f}")
-        if cfi:   fit_parts.append(f"CFI = {cfi:.3f}")
-        if tli:   fit_parts.append(f"TLI = {tli:.3f}")
-        if srmr:  fit_parts.append(f"SRMR = {srmr:.3f}")
-
         from utils.thresholds import FIT
         acceptable = (rmsea or 999) <= FIT["rmsea_acceptable"] and (cfi or 0) >= FIT["cfi_acceptable"]
         verdict = "acceptable fit" if acceptable else "marginal fit"
-
-        if chi2 is not None and df_:
-            lines.append(
-                f"The measurement model demonstrated {verdict}: "
-                f"chi2({int(df_)}) = {chi2:.3f}, p = {_fmt(p_, 3)}, "
-                f"{', '.join(fit_parts)}."
-            )
+        fit_parts = []
+        if rmsea is not None: fit_parts.append(f"RMSEA = {rmsea:.3f}")
+        if cfi   is not None: fit_parts.append(f"CFI = {cfi:.3f}")
+        if tli   is not None: fit_parts.append(f"TLI = {tli:.3f}")
+        if srmr  is not None: fit_parts.append(f"SRMR = {srmr:.3f}")
+        if chi2 and df_:
+            lines.append(f"The measurement model demonstrated {verdict}: chi2({int(df_)}) = {chi2:.3f}, p = {_fmt(p_,3)}, {', '.join(fit_parts)}.")
         else:
             lines.append(f"The measurement model demonstrated {verdict}: {', '.join(fit_parts)}.")
-
     if metrics:
         lines.append("")
         lines.append("Reliability and validity indicators:")
@@ -288,11 +231,8 @@ def generate_apa_narrative():
             if m.get("alpha"): parts.append(f"alpha = {m['alpha']:.3f}")
             if m.get("cr"):    parts.append(f"CR = {m['cr']:.3f}")
             if m.get("ave"):   parts.append(f"AVE = {m['ave']:.3f}")
-            if parts:
-                lines.append(f"  {cname}: {', '.join(parts)}")
+            if parts: lines.append(f"  {cname}: {', '.join(parts)}")
     lines.append("")
-
-    # Structural model
     lines.append("STRUCTURAL MODEL (SEM)")
     lines.append("-" * 40)
     if sem_fit:
@@ -303,24 +243,16 @@ def generate_apa_narrative():
         chi2  = _safe_float(sem_fit.get("chi2"))
         df_   = _safe_float(sem_fit.get("df"))
         p_    = _safe_float(sem_fit.get("p"))
-
-        fit_parts = []
-        if rmsea: fit_parts.append(f"RMSEA = {rmsea:.3f}")
-        if cfi:   fit_parts.append(f"CFI = {cfi:.3f}")
-        if tli:   fit_parts.append(f"TLI = {tli:.3f}")
-        if srmr:  fit_parts.append(f"SRMR = {srmr:.3f}")
-
         from utils.thresholds import FIT
         acceptable = (rmsea or 999) <= FIT["rmsea_acceptable"] and (cfi or 0) >= FIT["cfi_acceptable"]
         verdict = "acceptable fit" if acceptable else "marginal fit"
-
-        if chi2 is not None and df_:
-            lines.append(
-                f"The full structural model demonstrated {verdict}: "
-                f"chi2({int(df_)}) = {chi2:.3f}, p = {_fmt(p_, 3)}, "
-                f"{', '.join(fit_parts)}."
-            )
-
+        fit_parts = []
+        if rmsea is not None: fit_parts.append(f"RMSEA = {rmsea:.3f}")
+        if cfi   is not None: fit_parts.append(f"CFI = {cfi:.3f}")
+        if tli   is not None: fit_parts.append(f"TLI = {tli:.3f}")
+        if srmr  is not None: fit_parts.append(f"SRMR = {srmr:.3f}")
+        if chi2 and df_:
+            lines.append(f"The full structural model demonstrated {verdict}: chi2({int(df_)}) = {chi2:.3f}, p = {_fmt(p_,3)}, {', '.join(fit_parts)}.")
     if sem_paths:
         lines.append("")
         lines.append("Structural path results:")
@@ -330,20 +262,15 @@ def generate_apa_narrative():
             p_val = _safe_float(p.get("p"))
             if beta is None or p_val is None: continue
             sig   = "significant" if p_val < 0.05 else "not significant"
-            stars = _stars(p_val)
             lines.append(
                 f"  H{i+1}: {p.get('predictor','?')} --> {p.get('outcome','?')}: "
-                f"beta = {beta:.3f}{stars}, SE = {_fmt(se)}, p = {_fmt(p_val, 3)} -- {sig}."
+                f"beta = {beta:.3f}{_stars(p_val)}, SE = {_fmt(se)}, p = {_fmt(p_val,3)} -- {sig}."
             )
     lines.append("")
-
-    # Mediation
     if med_results and isinstance(med_results, dict):
         lines.append("MEDIATION ANALYSIS")
         lines.append("-" * 40)
-        x = med_vars.get("x", "X")
-        m = med_vars.get("m", "M")
-        y = med_vars.get("y", "Y")
+        x = med_vars.get("x","X"); m = med_vars.get("m","M"); y = med_vars.get("y","Y")
         indirect_data = med_results.get("indirect", {})
         if isinstance(indirect_data, dict):
             indirect = _safe_float(indirect_data.get("est"))
@@ -358,538 +285,716 @@ def generate_apa_narrative():
                     f"The indirect effect was {'significant' if sig else 'not significant'} "
                     f"(indirect = {indirect:.4f}, 95% BCa CI [{ci_lo:.4f}, {ci_hi:.4f}])."
                 )
-    lines.append("")
-
+        lines.append("")
     lines.append("=" * 70)
     lines.append("Note: All analyses via SEM Studio (R/lavaan).")
-    lines.append("* p < .05. ** p < .01. *** p < .001. dag p < .10")
+    lines.append("* p < .05; ** p < .01; *** p < .001; dag p < .10")
     lines.append("=" * 70)
-
     return "\n".join(lines)
 
 
 def render_apa_narrative():
     st.subheader("APA Results Narrative")
-    st.markdown(
-        "Auto-generated APA 7th edition results text. "
-        "**Copy, paste, then review and edit** before submitting to a journal."
-    )
-
+    st.markdown("Auto-generated APA 7th edition results text. Copy, paste, then review and edit before submitting.")
     narrative = generate_apa_narrative()
-    st.text_area(
-        "APA Results Section (copy-paste ready)",
-        value=narrative,
-        height=500,
-    )
-
+    st.text_area("APA Results Section (copy-paste ready)", value=narrative, height=500)
     badge("warning",
-        "Important: This auto-generated text is a starting point. "
-        "Always review, edit, and supplement with your own theoretical interpretation "
-        "before submitting to a journal."
+        "This auto-generated text is a starting point. "
+        "Always review, edit, and supplement with your own theoretical interpretation before submitting."
     )
 
 
-# ── SECTION 3: EXCEL EXPORT ──────────────────────────────────────
+# ── HTML REPORT ───────────────────────────────────────────────────
 
-def generate_excel():
-    try:
-        import openpyxl
-    except ImportError:
-        return None, "openpyxl not installed."
-
-    ss  = st.session_state
-    buf = io.BytesIO()
-
-    try:
-        with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-            df         = ss.get("df")
-            constructs = ss.get("constructs", {})
-            assignments= ss.get("assignments", {})
-
-            # Sheet 1: Overview
-            overview = pd.DataFrame({
-                "Item":  ["Sample Size (n)", "Constructs", "Indicators",
-                          "Estimator", "Analysis Date"],
-                "Value": [
-                    len(df) if df is not None else "N/A",
-                    len(constructs),
-                    sum(len(v) for v in constructs.values()),
-                    ss.get("recommended_estimator", "N/A"),
-                    datetime.now().strftime("%Y-%m-%d %H:%M"),
-                ]
-            })
-            overview.to_excel(writer, sheet_name="Overview", index=False)
-
-            # Sheet 2: Descriptive Statistics
-            if df is not None and assignments:
-                indicator_cols = [c for c, r in assignments.items() if r == "indicator"]
-                if indicator_cols:
-                    from scipy import stats as scipy_stats
-                    desc_rows = []
-                    for col in indicator_cols:
-                        x = df[col].dropna()
-                        if len(x) >= 3:
-                            desc_rows.append({
-                                "Variable": col,
-                                "N":        int(x.count()),
-                                "Mean":     round(float(x.mean()), 3),
-                                "SD":       round(float(x.std()), 3),
-                                "Min":      round(float(x.min()), 3),
-                                "Max":      round(float(x.max()), 3),
-                                "Skewness": round(float(scipy_stats.skew(x)), 3),
-                                "Kurtosis": round(float(scipy_stats.kurtosis(x)), 3),
-                                "Missing":  int(df[col].isna().sum()),
-                            })
-                    if desc_rows:
-                        pd.DataFrame(desc_rows).to_excel(
-                            writer, sheet_name="Descriptive Statistics", index=False
-                        )
-
-            # Sheet 3: CFA Fit Indices
-            cfa_fit = ss.get("cfa_fit", {})
-            if cfa_fit:
-                from utils.apa_tables import fit_indices_table
-                fit_df = fit_indices_table(cfa_fit)
-                if not fit_df.empty:
-                    fit_df.to_excel(writer, sheet_name="CFA Fit Indices", index=False)
-
-            # Sheet 4: Reliability and Validity
-            metrics = ss.get("cfa_metrics", {})
-            if metrics:
-                rel_rows = []
-                for cname, m in metrics.items():
-                    rel_rows.append({
-                        "Construct":  cname,
-                        "Items":      m.get("n_items", "—"),
-                        "Cronbach_a": _fmt(m.get("alpha")),
-                        "CR":         _fmt(m.get("cr")),
-                        "McDonald_w": _fmt(m.get("omega")),
-                        "AVE":        _fmt(m.get("ave")),
-                        "a_pass":     "Pass" if (m.get("alpha") or 0) >= 0.70 else "Fail",
-                        "CR_pass":    "Pass" if (m.get("cr")    or 0) >= 0.70 else "Fail",
-                        "AVE_pass":   "Pass" if (m.get("ave")   or 0) >= 0.50 else "Fail",
-                    })
-                pd.DataFrame(rel_rows).to_excel(
-                    writer, sheet_name="Reliability Validity", index=False
-                )
-
-            # Sheet 5: SEM Fit Indices
-            sem_fit = ss.get("sem_fit", {})
-            if sem_fit:
-                from utils.apa_tables import fit_indices_table
-                sem_fit_df = fit_indices_table(sem_fit)
-                if not sem_fit_df.empty:
-                    sem_fit_df.to_excel(writer, sheet_name="SEM Fit Indices", index=False)
-
-            # Sheet 6: Structural Paths
-            sem_paths = ss.get("sem_paths", [])
-            if sem_paths:
-                path_rows = []
-                for i, p in enumerate(sem_paths):
-                    p_val = _safe_float(p.get("p"))
-                    beta  = _safe_float(p.get("beta"))
-                    path_rows.append({
-                        "H":         f"H{i+1}",
-                        "Path":      f"{p.get('predictor','?')} -> {p.get('outcome','?')}",
-                        "Beta":      _fmt(beta),
-                        "SE":        _fmt(_safe_float(p.get("se"))),
-                        "z":         _fmt(_safe_float(p.get("z"))),
-                        "p":         _fmt(p_val),
-                        "Sig":       _stars(p_val),
-                        "Decision":  "Supported" if p_val is not None and float(p_val) < 0.05 else "Not Supported",
-                    })
-                pd.DataFrame(path_rows).to_excel(
-                    writer, sheet_name="Structural Paths", index=False
-                )
-
-            # Sheet 7: Mediation
-            med_results = ss.get("mediation_results", {})
-            med_vars    = ss.get("mediation_vars", {})
-            if med_results and isinstance(med_results, dict):
-                med_rows = []
-                for key, label in [
-                    ("a_path",  "a path (X -> M)"),
-                    ("b_path",  "b path (M -> Y | X)"),
-                    ("cp_path", "c prime (direct)"),
-                    ("total",   "Total (c)"),
-                    ("indirect","Indirect (a x b)"),
-                ]:
-                    d = med_results.get(key, {})
-                    if not isinstance(d, dict): continue
-                    est   = _safe_float(d.get("est"))
-                    ci_lo = _safe_float(d.get("ci_lo"))
-                    ci_hi = _safe_float(d.get("ci_hi"))
-                    med_rows.append({
-                        "Effect":  label,
-                        "Beta":    _fmt(est),
-                        "CI_Low":  _fmt(ci_lo) if ci_lo is not None else "—",
-                        "CI_High": _fmt(ci_hi) if ci_hi is not None else "—",
-                        "Sig":     (
-                            "Significant" if ci_lo is not None and ci_hi is not None and not (float(ci_lo) <= 0 <= float(ci_hi))
-                            else "Not Significant"
-                        ) if key == "indirect" else (
-                            _stars(est) if est is not None else "—"
-                        ),
-                    })
-                if med_rows:
-                    pd.DataFrame(med_rows).to_excel(
-                        writer, sheet_name="Mediation", index=False
-                    )
-
-            # Sheet 8: Moderation
-            mod_results = ss.get("moderation_results", {})
-            if mod_results and isinstance(mod_results, dict):
-                mod_vars = ss.get("moderation_vars", {})
-                mod_rows = [
-                    {"Term": f"{mod_vars.get('x','X')} (X)",
-                     "Beta": _fmt(_safe_float(mod_results.get("b1"))),
-                     "SE":   _fmt(_safe_float(mod_results.get("b1_se"))),
-                     "t":    _fmt(_safe_float(mod_results.get("b1_t"))),
-                     "p":    _fmt(_safe_float(mod_results.get("b1_p")))},
-                    {"Term": f"{mod_vars.get('w','W')} (W)",
-                     "Beta": _fmt(_safe_float(mod_results.get("b2"))),
-                     "SE":   _fmt(_safe_float(mod_results.get("b2_se"))),
-                     "t":    _fmt(_safe_float(mod_results.get("b2_t"))),
-                     "p":    _fmt(_safe_float(mod_results.get("b2_p")))},
-                    {"Term": f"X x W (interaction)",
-                     "Beta": _fmt(_safe_float(mod_results.get("b3"))),
-                     "SE":   _fmt(_safe_float(mod_results.get("b3_se"))),
-                     "t":    _fmt(_safe_float(mod_results.get("b3_t"))),
-                     "p":    _fmt(_safe_float(mod_results.get("b3_p")))},
-                ]
-                pd.DataFrame(mod_rows).to_excel(
-                    writer, sheet_name="Moderation", index=False
-                )
-
-            # Sheet 9: APA Narrative
-            # Write manually using openpyxl to prevent = being treated as formula
-            narrative = generate_apa_narrative()
-            apa_ws = writer.book.create_sheet("APA Narrative")
-            apa_ws.cell(row=1, column=1, value="APA Results Section")
-            # Prefix with space to prevent Excel treating = as formula
-            cell = apa_ws.cell(row=2, column=1)
-            cell.value = narrative
-            cell.data_type = "s"  # force string type
-            apa_ws.column_dimensions["A"].width = 120
-
-        return buf.getvalue(), None
-
-    except Exception as e:
-        return None, str(e)
-
-
-def render_excel_export():
-    st.subheader("Export to Excel")
-    st.markdown(
-        "Download all results in a single Excel workbook with separate sheets: "
-        "Overview, Descriptives, CFA Fit, Reliability & Validity, SEM Fit, "
-        "Structural Paths, Mediation, Moderation, APA Narrative."
+def _html_tbl(headers, rows, caption="", note=""):
+    hdr = "".join(f'<th style="padding:8px 14px;text-align:left;white-space:nowrap">{h}</th>' for h in headers)
+    body = ""
+    for i, row in enumerate(rows):
+        bg = "#f8fafc" if i % 2 == 0 else "#ffffff"
+        cells = "".join(
+            f'<td style="padding:7px 14px;border-bottom:1px solid #eee;vertical-align:top">{v}</td>'
+            for v in row
+        )
+        body += f'<tr style="background:{bg}">{cells}</tr>'
+    cap_html = f'<div style="font-size:0.8rem;color:#1a6fa8;font-weight:600;margin-bottom:6px">{caption}</div>' if caption else ""
+    note_html = f'<div style="font-size:0.78rem;color:#666;margin-top:6px;font-style:italic">{note}</div>' if note else ""
+    return (
+        cap_html +
+        f'<div style="overflow-x:auto">'
+        f'<table style="width:100%;border-collapse:collapse;font-size:0.88rem;margin:8px 0">'
+        f'<thead><tr style="background:#2E86AB;color:white">{hdr}</tr></thead>'
+        f'<tbody>{body}</tbody>'
+        f'</table></div>' +
+        note_html
     )
 
-    if st.button("Generate Excel Report", type="primary", key="export_excel_btn"):
-        with st.spinner("Generating Excel workbook..."):
-            excel_bytes, error = generate_excel()
-            if error:
-                st.error(f"Excel generation failed: {error}")
-            elif excel_bytes:
-                fname = f"SEM_Studio_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
-                st.download_button(
-                    label="Download Excel Report",
-                    data=excel_bytes,
-                    file_name=fname,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="dl_excel_btn"
-                )
-                badge("excellent", "Excel report ready for download!")
+def _html_section(num, title, content, color="#2E86AB"):
+    return (
+        f'<div style="margin:32px 0;page-break-inside:avoid">'
+        f'<h2 style="color:{color};border-bottom:2px solid {color};'
+        f'padding-bottom:8px;margin-bottom:16px;font-size:1.2rem">'
+        f'{num}. {title}</h2>'
+        f'{content}'
+        f'</div>'
+    )
+
+def _html_badge(level, msg):
+    colors = {"excellent":"#1a7a4a","ok":"#1a6fa8","warning":"#b7770d","critical":"#c0392b","good":"#2ecc71"}
+    c = colors.get(level, "#555")
+    return f'<div style="background:{c}18;border-left:4px solid {c};padding:10px 14px;border-radius:4px;margin:8px 0;color:#1a1a1a;font-size:0.88rem">{msg}</div>'
+
+def _fit_interpretation(index, value):
+    """Return (level, text) interpretation for a fit index value."""
+    if value is None: return ("", "—")
+    try: value = float(value)
+    except: return ("", "—")
+    if index == "rmsea":
+        if value <= 0.05: return ("excellent", f"Excellent (≤ .05)")
+        elif value <= 0.06: return ("good",    f"Good (≤ .06)")
+        elif value <= 0.08: return ("ok",      f"Acceptable (≤ .08)")
+        else: return ("critical", f"Poor (> .08)")
+    elif index in ("cfi","tli"):
+        if value >= 0.97: return ("excellent", f"Excellent (≥ .97)")
+        elif value >= 0.95: return ("good",    f"Good (≥ .95)")
+        elif value >= 0.90: return ("ok",      f"Acceptable (≥ .90)")
+        else: return ("critical", f"Poor (< .90)")
+    elif index == "srmr":
+        if value <= 0.05: return ("excellent", f"Excellent (≤ .05)")
+        elif value <= 0.08: return ("ok",      f"Acceptable (≤ .08)")
+        else: return ("critical", f"Poor (> .08)")
+    elif index in ("gfi","nfi"):
+        if value >= 0.95: return ("good",   f"Good (≥ .95)")
+        elif value >= 0.90: return ("ok",   f"Acceptable (≥ .90)")
+        else: return ("critical", f"Poor (< .90)")
+    return ("", "")
+
+def _level_badge_html(level, text):
+    icons = {"excellent":"✅","good":"✅","ok":"ℹ️","warning":"⚠️","critical":"❌"}
+    colors = {"excellent":"#1a7a4a","good":"#2ecc71","ok":"#1a6fa8","warning":"#b7770d","critical":"#c0392b"}
+    c = colors.get(level,"#888")
+    icon = icons.get(level,"")
+    return f'<span style="color:{c};font-weight:600">{icon} {text}</span>'
 
 
-def generate_html_report() -> str:
-    """Generate a complete APA-style HTML report of all SEM results."""
-    ss  = st.session_state
-    df  = ss.get("df")
-    n   = len(df) if df is not None else "N/A"
-    constructs   = ss.get("constructs", {})
-    cfa_fit      = ss.get("cfa_fit", {})
-    sem_fit      = ss.get("sem_fit", {})
-    metrics      = ss.get("cfa_metrics", {})
-    sem_paths    = ss.get("sem_paths", [])
-    sem_r2       = ss.get("sem_r2", [])
-    med_results  = ss.get("mediation_results")
-    med_vars     = ss.get("mediation_vars", {})
-    mod_results  = ss.get("moderation_results")
-    mod_vars     = ss.get("moderation_vars", {})
-    inv_results  = ss.get("invariance_results")
-    inv_level    = ss.get("invariance_level", "—")
-    narrative    = generate_apa_narrative()
-    from datetime import datetime
-    now = datetime.now().strftime("%B %d, %Y %H:%M")
+def generate_html_report():
+    ss          = st.session_state
+    df          = ss.get("df")
+    n           = len(df) if df is not None else "N/A"
+    constructs  = ss.get("constructs", {})
+    struct_paths= ss.get("structural_paths", [])
+    assignments = ss.get("assignments", {})
+    estimator   = ss.get("recommended_estimator", "N/A")
+    cfa_fit     = ss.get("cfa_fit", {})
+    sem_fit     = ss.get("sem_fit", {})
+    metrics     = ss.get("cfa_metrics", {})
+    cfa_loadings= ss.get("cfa_loadings", {})
+    sem_paths   = ss.get("sem_paths", [])
+    sem_r2      = ss.get("sem_r2", [])
+    med_results = ss.get("mediation_results")
+    med_vars    = ss.get("mediation_vars", {})
+    mod_results = ss.get("moderation_results")
+    mod_vars    = ss.get("moderation_vars", {})
+    inv_results = ss.get("invariance_results")
+    inv_level   = ss.get("invariance_level", "—")
+    comp_results= ss.get("comparison_results", {})
+    best_model  = ss.get("best_model", "—")
+    efa_result  = ss.get("efa_result")
+    narrative   = generate_apa_narrative()
+    now         = datetime.now().strftime("%B %d, %Y %H:%M")
 
-    def tbl(headers, rows, caption=""):
-        hdr = "".join(f"<th>{h}</th>" for h in headers)
-        body = ""
-        for i, row in enumerate(rows):
-            bg = "#f8fafc" if i % 2 == 0 else "#ffffff"
-            cells = "".join(f'<td style="padding:7px 12px;border-bottom:1px solid #eee">{v}</td>' for v in row)
-            body += f'<tr style="background:{bg}">{cells}</tr>'
-        cap = f'<caption style="text-align:left;font-size:0.82rem;color:#666;padding:4px 0">{caption}</caption>' if caption else ""
-        return (
-            f'<table style="width:100%;border-collapse:collapse;margin:12px 0;font-size:0.9rem">'
-            f'{cap}'
-            f'<thead><tr style="background:#2E86AB;color:white">{hdr}</tr></thead>'
-            f'<tbody>{body}</tbody></table>'
-        )
+    sections = []
 
-    def section(title, content, color="#2E86AB"):
-        return (
-            f'<div style="margin:28px 0">'
-            f'<h2 style="color:{color};border-bottom:2px solid {color};padding-bottom:6px;margin-bottom:14px">{title}</h2>'
-            f'{content}'
-            f'</div>'
-        )
-
-    def badge_html(level, msg):
-        colors = {"excellent":"#1a7a4a","ok":"#1a6fa8","warning":"#b7770d","critical":"#c0392b"}
-        c = colors.get(level, "#555")
-        return f'<div style="background:{c}18;border-left:4px solid {c};padding:10px 14px;border-radius:4px;margin:8px 0;color:#1a1a1a">{msg}</div>'
-
-    # ── Build sections ─────────────────────────────────────────
-
-    # 1. Overview
+    # ── 1. Overview ──────────────────────────────────────────────
     overview_rows = [
-        ["Sample Size (n)", str(n)],
+        ["Sample Size (n)", f"<b>{n}</b>"],
         ["Number of Constructs", str(len(constructs))],
         ["Total Indicators", str(sum(len(v) for v in constructs.values()))],
-        ["Estimator", ss.get("recommended_estimator", "N/A")],
-        ["Generated", now],
+        ["Structural Paths", str(len(struct_paths))],
+        ["Estimator", f"<b>{estimator}</b>"],
+        ["Report Generated", now],
     ]
-    s1 = section("1. Overview", tbl(["Item", "Value"], overview_rows))
+    sections.append(_html_section(1, "Study Overview",
+        _html_tbl(["Item","Value"], overview_rows)))
 
-    # 2. Constructs
-    const_rows = [[c, ", ".join(items), str(len(items))] for c, items in constructs.items()]
-    s2 = section("2. Measurement Model Specification",
-        tbl(["Construct", "Indicators", "n Items"], const_rows))
+    # ── 2. Construct Definitions ──────────────────────────────────
+    const_rows = []
+    for c, items in constructs.items():
+        const_rows.append([f"<b>{c}</b>", ", ".join(items), str(len(items))])
+    path_rows = [[f"<b>H{i+1}</b>", f"{pred} → {out}"] for i,(pred,out) in enumerate(struct_paths)]
+    s2 = _html_tbl(["Construct","Indicators","n"], const_rows, "Measurement Model")
+    if path_rows:
+        s2 += _html_tbl(["Hypothesis","Path"], path_rows, "Structural Paths (Hypotheses)")
+    sections.append(_html_section(2, "Model Specification", s2))
 
-    # 3. CFA Fit
-    fit_rows = []
-    fit_keys = [
-        ("chi2",  "chi2",    "Non-significant preferred"),
-        ("df",    "df",      "Degrees of freedom"),
-        ("pvalue","p",       "p-value"),
-        ("rmsea", "RMSEA",   "<=.05 excellent; <=.06 good; <=.08 acceptable"),
-        ("cfi",   "CFI",     ">=.97 excellent; >=.95 good; >=.90 acceptable"),
-        ("tli",   "TLI",     ">=.95 good; >=.90 acceptable"),
-        ("srmr",  "SRMR",    "<=.05 good; <=.08 acceptable"),
-        ("aic",   "AIC",     "Lower is better"),
-        ("bic",   "BIC",     "Lower is better"),
+    # ── 3. Descriptive Statistics ─────────────────────────────────
+    indicator_cols = [c for c,r in assignments.items() if r == "indicator"] if assignments else []
+    desc_rows = []
+    if df is not None and indicator_cols:
+        from scipy import stats as scipy_stats
+        for col in indicator_cols:
+            x = df[col].dropna()
+            if len(x) < 3: continue
+            sk = float(scipy_stats.skew(x))
+            ku = float(scipy_stats.kurtosis(x))
+            sk_flag = "" if abs(sk) <= 1 else (" ⚠️" if abs(sk) <= 2 else " ❌")
+            ku_flag = "" if abs(ku) <= 3 else (" ⚠️" if abs(ku) <= 7 else " ❌")
+            miss_n  = int(df[col].isna().sum())
+            miss_pct= miss_n / len(df) * 100
+            desc_rows.append([
+                col,
+                str(int(x.count())),
+                f"{float(x.mean()):.3f}",
+                f"{float(x.std()):.3f}",
+                f"{float(x.min()):.1f}",
+                f"{float(x.max()):.1f}",
+                f"{sk:.3f}{sk_flag}",
+                f"{ku:.3f}{ku_flag}",
+                f"{miss_n} ({miss_pct:.1f}%)",
+            ])
+    s3 = _html_tbl(
+        ["Variable","N","Mean","SD","Min","Max","Skewness","Kurtosis","Missing"],
+        desc_rows,
+        note="Note: ⚠️ = mild non-normality; ❌ = substantial non-normality. "
+             "|Skewness| > 2 or |Kurtosis| > 7 suggests MLR estimator (Hair et al., 2019)."
+    )
+    mardia = ss.get("mardia_result", {})
+    if mardia:
+        sk_p = _safe_float(mardia.get("skewness_p"))
+        ku_p = _safe_float(mardia.get("kurtosis_p"))
+        if sk_p is not None:
+            normal = sk_p > 0.05 and ku_p > 0.05
+            s3 += _html_badge(
+                "ok" if normal else "warning",
+                f"Mardia's Test: skewness p = {_fmt(sk_p,4)}, kurtosis p = {_fmt(ku_p,4)}. "
+                f"{'Multivariate normality satisfied. ML estimation appropriate.' if normal else 'Multivariate normality violated. MLR (Robust ML) recommended.'}"
+            )
+    s3 += _html_badge("ok", f"Estimator used: <b>{estimator}</b>")
+    sections.append(_html_section(3, "Descriptive Statistics and Assumption Testing", s3))
+
+    # ── 4. EFA Results ────────────────────────────────────────────
+    if efa_result and isinstance(efa_result, dict) and "error" not in efa_result:
+        kmo     = _safe_float(efa_result.get("kmo"))
+        bart_p  = _safe_float(efa_result.get("bartlett_p"))
+        n_f     = efa_result.get("n_factors")
+        if isinstance(n_f, list): n_f = n_f[0]
+        efa_rows = [
+            ["KMO Overall",    _fmt(kmo), "≥ .80 meritorious; ≥ .60 acceptable", _level_badge_html("excellent" if kmo and kmo >= 0.80 else "ok" if kmo and kmo >= 0.60 else "critical", "Meritorious" if kmo and kmo >= 0.80 else "Acceptable" if kmo and kmo >= 0.60 else "Poor")],
+            ["Bartlett's p",   "< .001" if bart_p is not None and bart_p < 0.001 else _fmt(bart_p,4), "p < .05 required", _level_badge_html("excellent" if bart_p is not None and bart_p < 0.05 else "critical", "Significant" if bart_p is not None and bart_p < 0.05 else "Not Significant")],
+            ["Factors Extracted", str(int(n_f)) if n_f else "—", "Based on parallel analysis", ""],
+            ["Rotation",       str(efa_result.get("rotation","—")), "PAF extraction", ""],
+        ]
+        s4 = _html_tbl(["Test","Value","Criterion","Interpretation"], efa_rows, "EFA Factorability")
+        # Factor names
+        factor_names = ss.get("efa_factor_names", {})
+        if factor_names:
+            fn_rows = [[f, name] for f, name in factor_names.items()]
+            s4 += _html_tbl(["Factor","Construct Name"], fn_rows, "Factor Assignments")
+        sections.append(_html_section(4, "Exploratory Factor Analysis (EFA)", s4))
+
+    # ── 5. CFA Fit Indices ────────────────────────────────────────
+    fit_specs = [
+        ("chi2",  "χ²",     "Non-significant preferred (sensitive to n)"),
+        ("df",    "df",     "Degrees of freedom"),
+        ("pvalue","p",      "χ² p-value"),
+        ("rmsea", "RMSEA",  "≤ .05 excellent; ≤ .06 good; ≤ .08 acceptable"),
+        ("cfi",   "CFI",    "≥ .97 excellent; ≥ .95 good; ≥ .90 acceptable"),
+        ("tli",   "TLI",    "≥ .95 good; ≥ .90 acceptable"),
+        ("srmr",  "SRMR",   "≤ .05 good; ≤ .08 acceptable"),
+        ("gfi",   "GFI",    "≥ .95 good; ≥ .90 acceptable"),
+        ("nfi",   "NFI",    "≥ .95 good; ≥ .90 acceptable"),
+        ("aic",   "AIC",    "Lower is better"),
+        ("bic",   "BIC",    "Lower is better"),
     ]
-    for key, label, criterion in fit_keys:
+    cfa_fit_rows = []
+    for key, label, criterion in fit_specs:
         val = cfa_fit.get(key)
-        if val is not None:
-            try:
-                fit_rows.append([label, f"{float(val):.3f}", criterion])
-            except: pass
-    s3 = section("3. CFA Model Fit", tbl(["Index", "Value", "Criterion"], fit_rows,
-        "Note: chi2/df <= 2.0 = good; <= 5.0 = acceptable (Kline, 2016). RMSEA, CFI, TLI, SRMR per Hu & Bentler (1999)."))
+        if val is None: val = cfa_fit.get(key.replace("_",""))
+        if val is None: continue
+        try: val_f = float(val)
+        except: continue
+        level, interp = _fit_interpretation(key, val_f)
+        val_str = f"{val_f:.3f}" if key not in ("df",) else str(int(val_f))
+        interp_html = _level_badge_html(level, interp) if interp else ""
+        cfa_fit_rows.append([label, val_str, criterion, interp_html])
+    # chi2/df
+    chi2 = _safe_float(cfa_fit.get("chi2"))
+    df_  = _safe_float(cfa_fit.get("df"))
+    if chi2 and df_ and float(df_) > 0:
+        ratio = chi2/df_
+        level_r = "good" if ratio <= 2 else "ok" if ratio <= 5 else "critical"
+        label_r = "Good (≤ 2.0)" if ratio <= 2 else "Acceptable (≤ 5.0)" if ratio <= 5 else "Poor (> 5.0)"
+        cfa_fit_rows.insert(2, ["χ²/df", f"{ratio:.3f}", "≤ 2.0 good; ≤ 5.0 acceptable",
+                                _level_badge_html(level_r, label_r)])
+    s5 = _html_tbl(["Index","Value","Criterion","Interpretation"], cfa_fit_rows,
+        "CFA Goodness-of-Fit Indices",
+        "Note: Hu & Bentler (1999); Kline (2016); Jöreskog & Sörbom (1984).")
+    sections.append(_html_section(5, "CFA Model Fit", s5))
 
-    # 4. Factor Loadings
-    cfa_loadings = ss.get("cfa_loadings", {})
+    # ── 6. Factor Loadings ────────────────────────────────────────
     load_rows = []
     for cname, items_dict in cfa_loadings.items():
         for item, lam in items_dict.items():
             try:
                 lam_f = float(lam)
-                status = "Strong" if abs(lam_f) >= 0.70 else "Acceptable" if abs(lam_f) >= 0.50 else "Weak"
-                load_rows.append([cname, item, f"{lam_f:.3f}", status])
+                status = "Strong (≥.70)" if abs(lam_f) >= 0.70 else "Acceptable (≥.50)" if abs(lam_f) >= 0.50 else "Weak (<.50)"
+                color  = "#1a7a4a" if abs(lam_f) >= 0.70 else "#1a6fa8" if abs(lam_f) >= 0.50 else "#c0392b"
+                load_rows.append([cname, item, f'<span style="color:{color};font-weight:600">{lam_f:.3f}</span>', f'<span style="color:{color}">{status}</span>'])
             except: pass
-    s4 = section("4. Factor Loadings", tbl(
-        ["Construct", "Item", "Std. Loading (lambda)", "Status"],
-        load_rows,
-        "Note: lambda >= .70 = strong; >= .50 = acceptable; < .50 = weak (Hair et al., 2019)."
-    ))
+    s6 = _html_tbl(["Construct","Item","Std. Loading (λ)","Status"], load_rows,
+        "Standardized Factor Loadings",
+        "Note: λ ≥ .70 = strong; λ ≥ .50 = acceptable; λ < .50 = weak (Hair et al., 2019). p < .001 for all significant loadings.")
+    sections.append(_html_section(6, "Factor Loadings", s6))
 
-    # 5. Reliability & Validity
+    # ── 7. Reliability and Validity ───────────────────────────────
     rel_rows = []
     for cname, m in metrics.items():
+        alpha = _safe_float(m.get("alpha"))
+        cr    = _safe_float(m.get("cr"))
+        ave   = _safe_float(m.get("ave"))
+        def pass_fail(val, threshold, fmt=".3f"):
+            if val is None: return "—"
+            color = "#1a7a4a" if val >= threshold else "#c0392b"
+            icon  = "✅" if val >= threshold else "❌"
+            return f'<span style="color:{color}">{icon} {val:{fmt}}</span>'
         rel_rows.append([
-            cname,
-            str(m.get("n_items", "—")),
-            _fmt(m.get("alpha")),
-            _fmt(m.get("cr")),
-            _fmt(m.get("ave")),
-            "Pass" if (m.get("alpha") or 0) >= 0.70 else "Fail",
-            "Pass" if (m.get("cr")    or 0) >= 0.70 else "Fail",
-            "Pass" if (m.get("ave")   or 0) >= 0.50 else "Fail",
+            f"<b>{cname}</b>",
+            str(m.get("n_items","—")),
+            pass_fail(alpha, 0.70),
+            pass_fail(cr,    0.70),
+            pass_fail(ave,   0.50),
         ])
-    s5 = section("5. Reliability and Validity", tbl(
-        ["Construct", "Items", "Cronbach alpha", "CR", "AVE", "alpha>=.70", "CR>=.70", "AVE>=.50"],
-        rel_rows,
-        "Note: CR = Composite Reliability; AVE = Average Variance Extracted. Criteria per Fornell & Larcker (1981); Hair et al. (2019)."
-    ))
+    s7  = _html_tbl(["Construct","Items","Cronbach α","CR","AVE"], rel_rows,
+        "Reliability and Convergent Validity",
+        "Note: α ≥ .70 acceptable (Nunnally, 1978); CR ≥ .70, AVE ≥ .50 (Fornell & Larcker, 1981).")
 
-    # 6. SEM Fit
+    # Fornell-Larcker matrix
+    if df is not None and constructs:
+        parcel_df = pd.DataFrame()
+        for cname, items in constructs.items():
+            valid = [c for c in items if c in df.columns]
+            if valid: parcel_df[cname] = df[valid].mean(axis=1)
+        parcel_df = parcel_df.dropna()
+        if parcel_df.shape[1] >= 2:
+            corr = parcel_df.corr()
+            cn   = list(parcel_df.columns)
+            fl_headers = [""] + cn
+            fl_rows    = []
+            for c1 in cn:
+                row = [f"<b>{c1}</b>"]
+                for c2 in cn:
+                    if c1 == c2:
+                        ave = _safe_float(metrics.get(c1, {}).get("ave"))
+                        val = f"<b>{np.sqrt(ave):.3f}(*)</b>" if ave else "—"
+                    else:
+                        r = corr.loc[c1,c2] if c1 in corr.index and c2 in corr.columns else np.nan
+                        val = f"{r:.3f}" if not np.isnan(r) else "—"
+                    row.append(val)
+                fl_rows.append(row)
+            s7 += _html_tbl(fl_headers, fl_rows,
+                "Fornell-Larcker Criterion",
+                "Note: Diagonal (*) = sqrt(AVE). Discriminant validity supported when sqrt(AVE) > all off-diagonal correlations in the same row/column.")
+    sections.append(_html_section(7, "Reliability and Validity", s7))
+
+    # ── 8. SEM Fit Indices ────────────────────────────────────────
     sem_fit_rows = []
-    for key, label, criterion in fit_keys:
+    for key, label, criterion in fit_specs:
         val = sem_fit.get(key)
-        if val is not None:
-            try:
-                sem_fit_rows.append([label, f"{float(val):.3f}", criterion])
-            except: pass
-    s6 = section("6. SEM Model Fit", tbl(["Index", "Value", "Criterion"], sem_fit_rows,
-        "Note: Same criteria as CFA fit above."))
+        if val is None: continue
+        try: val_f = float(val)
+        except: continue
+        level, interp = _fit_interpretation(key, val_f)
+        val_str = f"{val_f:.3f}" if key != "df" else str(int(val_f))
+        interp_html = _level_badge_html(level, interp) if interp else ""
+        sem_fit_rows.append([label, val_str, criterion, interp_html])
+    chi2s = _safe_float(sem_fit.get("chi2"))
+    df_s  = _safe_float(sem_fit.get("df"))
+    if chi2s and df_s and float(df_s) > 0:
+        ratio = chi2s/df_s
+        level_r = "good" if ratio <= 2 else "ok" if ratio <= 5 else "critical"
+        label_r = "Good (≤ 2.0)" if ratio <= 2 else "Acceptable (≤ 5.0)" if ratio <= 5 else "Poor (> 5.0)"
+        sem_fit_rows.insert(2, ["χ²/df", f"{ratio:.3f}", "≤ 2.0 good; ≤ 5.0 acceptable",
+                                _level_badge_html(level_r, label_r)])
+    s8 = _html_tbl(["Index","Value","Criterion","Interpretation"], sem_fit_rows,
+        "SEM Goodness-of-Fit Indices",
+        "Note: Same criteria as CFA fit indices above.")
+    sections.append(_html_section(8, "SEM Model Fit", s8))
 
-    # 7. Structural Paths
-    path_rows = []
+    # ── 9. Structural Paths ───────────────────────────────────────
+    path_rows_html = []
     for i, p in enumerate(sem_paths):
-        pval = _safe_float(p.get("p"))
-        beta = _safe_float(p.get("beta"))
-        path_rows.append([
-            f"H{i+1}",
-            f"{p.get('predictor','?')} -> {p.get('outcome','?')}",
-            _fmt(beta),
-            _fmt(_safe_float(p.get("se"))),
-            _fmt(_safe_float(p.get("z"))),
-            _fmt(pval),
-            _stars(pval),
-            "Supported" if pval is not None and pval < 0.05 else "Not Supported",
+        beta  = _safe_float(p.get("beta"))
+        se    = _safe_float(p.get("se"))
+        z     = _safe_float(p.get("z"))
+        pval  = _safe_float(p.get("p"))
+        if beta is None: continue
+        sig   = pval is not None and pval < 0.05
+        color = "#1a7a4a" if (sig and beta > 0) else "#c0392b" if (sig and beta < 0) else "#888"
+        f2    = beta**2 / (1 - beta**2) if abs(beta) < 1 else None
+        f2_str = f"{f2:.3f}" if f2 else "—"
+        f2_label = "Large" if f2 and f2 >= 0.35 else "Medium" if f2 and f2 >= 0.15 else "Small" if f2 and f2 >= 0.02 else "Negligible"
+        decision = f'<span style="color:{"#1a7a4a" if sig else "#c0392b"};font-weight:700">{"✅ Supported" if sig else "❌ Not Supported"}</span>'
+        path_rows_html.append([
+            f"<b>H{i+1}</b>",
+            f"{p.get('predictor','?')} → {p.get('outcome','?')}",
+            f'<span style="color:{color};font-weight:700">{beta:.3f}{_stars(pval)}</span>',
+            _fmt(se), _fmt(z),
+            _fmt(pval,4) if pval is not None else "—",
+            f"{f2_str} ({f2_label})",
+            decision,
         ])
-    s7 = section("7. Structural Paths", tbl(
-        ["H", "Path", "Beta", "SE", "z", "p", "Sig.", "Decision"],
-        path_rows,
-        "Note: * p < .05; ** p < .01; *** p < .001. Beta = standardized path coefficient."
-    ))
+    s9 = _html_tbl(
+        ["H","Path","β","SE","z","p","Cohen's f²","Decision"],
+        path_rows_html,
+        "Structural Path Coefficients",
+        "Note: β = standardized path coefficient. * p < .05; ** p < .01; *** p < .001. "
+        "Cohen's f²: ≥ .02 small; ≥ .15 medium; ≥ .35 large (Cohen, 1988)."
+    )
+    sections.append(_html_section(9, "Structural Path Coefficients", s9))
 
-    # 8. R-squared
-    r2_rows = []
+    # ── 10. R-Squared ─────────────────────────────────────────────
+    r2_rows_html = []
     for row in sem_r2:
-        if isinstance(row, dict):
-            r2_rows.append([row.get("Construct","—"), _fmt(row.get("R2")), row.get("R2 (%)","—")])
-    s8 = section("8. Explained Variance (R2)", tbl(
-        ["Construct", "R2", "R2 (%)"],
-        r2_rows,
-        "Note: R2 >= .26 = substantial; >= .13 = moderate; >= .02 = weak (Cohen, 1988)."
-    )) if r2_rows else ""
+        if not isinstance(row, dict): continue
+        r2  = _safe_float(row.get("R2"))
+        if r2 is None: continue
+        level_r2 = "good" if r2 >= 0.26 else "ok" if r2 >= 0.13 else "warning" if r2 >= 0.02 else "critical"
+        label_r2 = "Substantial (≥.26)" if r2 >= 0.26 else "Moderate (≥.13)" if r2 >= 0.13 else "Weak (≥.02)" if r2 >= 0.02 else "Negligible"
+        r2_rows_html.append([
+            f"<b>{row.get('Construct','—')}</b>",
+            f"{r2:.3f}",
+            f"{r2:.1%}",
+            _level_badge_html(level_r2, label_r2),
+        ])
+    s10 = _html_tbl(["Construct","R²","R² (%)","Level"], r2_rows_html,
+        "Explained Variance (R²) for Endogenous Constructs",
+        "Note: R² ≥ .26 = substantial; ≥ .13 = moderate; ≥ .02 = weak (Cohen, 1988).")
+    sections.append(_html_section(10, "Explained Variance (R²)", s10))
 
-    # 9. Mediation
-    s9 = ""
+    # ── 11. Mediation ─────────────────────────────────────────────
     if med_results and isinstance(med_results, dict):
         x = med_vars.get("x","X"); m_v = med_vars.get("m","M"); y = med_vars.get("y","Y")
-        med_rows = []
+        med_rows_html = []
         for key, label in [
-            ("a_path", f"{x} -> {m_v} (a path)"),
-            ("b_path", f"{m_v} -> {y} | {x} (b path)"),
-            ("cp_path",f"{x} -> {y} direct (c prime)"),
-            ("total",  f"{x} -> {y} total (c)"),
-            ("indirect",f"Indirect effect (a x b)"),
+            ("a_path",  f"{x} → {m_v} (a path)"),
+            ("b_path",  f"{m_v} → {y} | {x} (b path)"),
+            ("cp_path", f"{x} → {y} direct (c')"),
+            ("total",   f"{x} → {y} total (c)"),
+            ("indirect",f"Indirect (a × b)"),
         ]:
             d = med_results.get(key, {})
             if not isinstance(d, dict): continue
             est   = _safe_float(d.get("est"))
+            pval  = _safe_float(d.get("p"))
             ci_lo = _safe_float(d.get("ci_lo"))
             ci_hi = _safe_float(d.get("ci_hi"))
-            pval  = _safe_float(d.get("p"))
             ci_str = f"[{ci_lo:.4f}, {ci_hi:.4f}]" if ci_lo is not None and ci_hi is not None else "—"
             if key == "indirect":
-                sig = "Significant" if (ci_lo is not None and ci_hi is not None and not (ci_lo <= 0 <= ci_hi)) else "Not Significant"
+                sig = ci_lo is not None and ci_hi is not None and not (ci_lo <= 0 <= ci_hi)
+                sig_str = _level_badge_html("excellent" if sig else "critical",
+                                            "Significant (CI ≠ 0)" if sig else "Not Significant (CI includes 0)")
             else:
-                sig = _stars(pval) if pval is not None else "—"
-            med_rows.append([label, _fmt(est), ci_str, sig])
-        s9 = section("9. Mediation Analysis", tbl(
-            ["Effect", "Beta", "95% BCa CI", "Sig."],
-            med_rows,
-            f"Note: Bootstrap mediation via R/lavaan. X={x}, M={m_v}, Y={y}. Significance: CI not containing zero."
-        ))
+                sig_str = _stars(pval) if pval is not None else "—"
+            med_rows_html.append([label, _fmt(est), ci_str, sig_str])
 
-    # 10. Moderation
-    s10 = ""
+        # Mediation type
+        indirect_d = med_results.get("indirect", {})
+        if isinstance(indirect_d, dict):
+            ind  = _safe_float(indirect_d.get("est"))
+            cilo = _safe_float(indirect_d.get("ci_lo"))
+            cihi = _safe_float(indirect_d.get("ci_hi"))
+            cp_d = med_results.get("cp_path", {})
+            dir_ = _safe_float(cp_d.get("est") if isinstance(cp_d,dict) else None)
+            tot_d= med_results.get("total", {})
+            tot  = _safe_float(tot_d.get("est") if isinstance(tot_d,dict) else None)
+            if ind is not None and cilo is not None and cihi is not None:
+                sig_ind = not (cilo <= 0 <= cihi)
+                sig_dir = dir_ is not None and abs(dir_) > 0.05
+                if sig_ind and not sig_dir:
+                    med_type = "Full (Indirect-Only) Mediation"
+                    med_level = "excellent"
+                elif sig_ind and sig_dir:
+                    med_type = "Partial Mediation"
+                    med_level = "ok"
+                else:
+                    med_type = "No Mediation"
+                    med_level = "warning"
+                vaf_str = ""
+                if tot and abs(tot) > 0.001 and ind is not None:
+                    vaf = ind / tot
+                    vaf_str = f" VAF = {vaf:.1%}."
+
+        s11 = _html_tbl(["Effect","β","95% BCa CI","Significance"], med_rows_html,
+            f"Bootstrap Mediation: {x} → {m_v} → {y}",
+            f"Note: {med_results.get('n_boot',5000):,}-resample bootstrap via R/lavaan. "
+            "Significance criterion: 95% BCa CI not containing zero.")
+        s11 += _html_badge(med_level, f"<b>{med_type}</b>: indirect = {_fmt(ind,4)}, "
+            f"95% BCa CI [{_fmt(cilo,4)}, {_fmt(cihi,4)}].{vaf_str}")
+        sections.append(_html_section(11, f"Mediation Analysis ({x} → {m_v} → {y})", s11))
+
+    # ── 12. Moderation ────────────────────────────────────────────
     if mod_results and isinstance(mod_results, dict):
         x = mod_vars.get("x","X"); w = mod_vars.get("w","W"); y = mod_vars.get("y","Y")
-        b3   = _safe_float(mod_results.get("b3"))
-        b3_p = _safe_float(mod_results.get("b3_p"))
-        r2_2 = _safe_float(mod_results.get("r2_2"))
-        dr2  = _safe_float(mod_results.get("delta_r2"))
-        mod_rows = [
-            [f"{x} (X)",          _fmt(_safe_float(mod_results.get("b1"))), _fmt(_safe_float(mod_results.get("b1_se"))), _fmt(_safe_float(mod_results.get("b1_p"))), _stars(_safe_float(mod_results.get("b1_p")))],
-            [f"{w} (W)",          _fmt(_safe_float(mod_results.get("b2"))), _fmt(_safe_float(mod_results.get("b2_se"))), _fmt(_safe_float(mod_results.get("b2_p"))), _stars(_safe_float(mod_results.get("b2_p")))],
-            [f"{x} x {w} (Int.)",_fmt(b3),                                  _fmt(_safe_float(mod_results.get("b3_se"))), _fmt(b3_p),                                  _stars(b3_p)],
-        ]
-        mod_content = tbl(["Term","Beta","SE","p","Sig."], mod_rows,
-            f"Note: Variables mean-centered. Interaction significant if p < .05. X={x}, W={w}, Y={y}.")
-        mod_content += f"<p>Model R2 = {_fmt(r2_2)}, Delta R2 = {_fmt(dr2)}</p>"
-        s10 = section("10. Moderation Analysis", mod_content)
+        b1=_safe_float(mod_results.get("b1")); b1_p=_safe_float(mod_results.get("b1_p"))
+        b2=_safe_float(mod_results.get("b2")); b2_p=_safe_float(mod_results.get("b2_p"))
+        b3=_safe_float(mod_results.get("b3")); b3_p=_safe_float(mod_results.get("b3_p"))
+        r2_1=_safe_float(mod_results.get("r2_1")); r2_2=_safe_float(mod_results.get("r2_2"))
+        dr2 =_safe_float(mod_results.get("delta_r2"))
 
-    # 11. Invariance
-    s11 = ""
+        mod_coef_rows = [
+            [f"<b>{x}</b> (X)",         _fmt(b1), _fmt(_safe_float(mod_results.get("b1_se"))), _fmt(b1_p,4), _stars(b1_p), _level_badge_html("ok" if b1_p is not None and b1_p < 0.05 else "warning", "Significant" if b1_p is not None and b1_p < 0.05 else "n.s.")],
+            [f"<b>{w}</b> (W)",         _fmt(b2), _fmt(_safe_float(mod_results.get("b2_se"))), _fmt(b2_p,4), _stars(b2_p), _level_badge_html("ok" if b2_p is not None and b2_p < 0.05 else "warning", "Significant" if b2_p is not None and b2_p < 0.05 else "n.s.")],
+            [f"<b>{x} × {w}</b> (Int.)",_fmt(b3), _fmt(_safe_float(mod_results.get("b3_se"))), _fmt(b3_p,4), _stars(b3_p), _level_badge_html("ok" if b3_p is not None and b3_p < 0.05 else "warning", "Significant ✅" if b3_p is not None and b3_p < 0.05 else "Not Significant")],
+        ]
+        s12 = _html_tbl(["Term","β","SE","p","Sig.","Interpretation"], mod_coef_rows,
+            f"Moderation Analysis: {x} × {w} → {y}")
+        s12 += _html_tbl(
+            ["Model","R²","ΔR²"],
+            [[f"Model 1: {x} + {w}", _fmt(r2_1), "—"],
+             [f"Model 2: {x} + {w} + {x}×{w}", _fmt(r2_2), _fmt(dr2,4)]],
+            note="Note: Variables mean-centered before interaction (Aiken & West, 1991). "
+                 "ΔR² = variance explained by interaction term."
+        )
+        # Simple slopes
+        slopes = mod_results.get("simple_slopes", {})
+        if slopes and isinstance(slopes, dict):
+            ss_rows = []
+            for label, sd in slopes.items():
+                if not isinstance(sd, dict): continue
+                slope = _safe_float(sd.get("slope"))
+                sp    = _safe_float(sd.get("p"))
+                ss_rows.append([label, _fmt(slope,4), _fmt(_safe_float(sd.get("se")),4),
+                                 _fmt(_safe_float(sd.get("t")),3), _fmt(sp,4), _stars(sp),
+                                 _level_badge_html("ok" if sp is not None and sp < 0.05 else "warning",
+                                                   "Significant" if sp is not None and sp < 0.05 else "n.s.")])
+            s12 += _html_tbl(
+                ["W Level","Simple Slope","SE","t","p","Sig.","Interpretation"],
+                ss_rows,
+                "Simple Slope Analysis",
+                "Note: Simple slopes show X → Y effect at low (−1 SD), mean, and high (+1 SD) of W."
+            )
+        sections.append(_html_section(12, f"Moderation Analysis ({x} × {w} → {y})", s12))
+
+    # ── 13. Measurement Invariance ────────────────────────────────
     if inv_results and isinstance(inv_results, dict) and "error" not in inv_results:
-        inv_rows = []
+        inv_model_rows = []
         for name, label in [("configural","Configural"),("metric","Metric"),("scalar","Scalar")]:
-            fit_d = inv_results.get(name, {})
-            if isinstance(fit_d, dict):
-                inv_rows.append([
-                    label,
-                    _fmt(fit_d.get("cfi")),
-                    _fmt(fit_d.get("rmsea")),
-                    _fmt(fit_d.get("srmr")),
-                ])
+            fd = inv_results.get(name, {})
+            if not isinstance(fd, dict): continue
+            inv_model_rows.append([
+                f"<b>{label}</b>",
+                _fmt(fd.get("chi2"),3),
+                str(int(fd.get("df",0))) if fd.get("df") else "—",
+                _fmt(fd.get("cfi"),3),
+                _fmt(fd.get("rmsea"),3),
+                _fmt(fd.get("srmr"),3),
+            ])
         diff_rows = []
         for key, label in [("diff_metric","Metric vs Configural"),("diff_scalar","Scalar vs Metric")]:
-            d = inv_results.get(key, {})
-            if isinstance(d, dict):
-                dcfi = _safe_float(d.get("delta_cfi"))
-                diff_rows.append([
-                    label,
-                    _fmt(d.get("delta_chi2")),
-                    _fmt(dcfi),
-                    _fmt(d.get("delta_rmsea")),
-                    "Supported" if dcfi is not None and dcfi >= -0.010 else "Not Supported",
+            d = inv_results.get(key,{})
+            if not isinstance(d, dict): continue
+            dcfi = _safe_float(d.get("delta_cfi"))
+            supported = dcfi is not None and dcfi >= -0.010
+            diff_rows.append([
+                label,
+                _fmt(d.get("delta_chi2"),3),
+                _fmt(dcfi,4),
+                _fmt(d.get("delta_rmsea"),4),
+                _level_badge_html("ok" if supported else "warning",
+                                  "Supported (ΔCFI ≥ −.010)" if supported else "Not Supported (ΔCFI < −.010)"),
+            ])
+        s13  = _html_tbl(["Model","χ²","df","CFI","RMSEA","SRMR"], inv_model_rows, "Invariance Model Fit")
+        s13 += _html_tbl(["Comparison","Δχ²","ΔCFI","ΔRMSEA","Invariance"], diff_rows,
+            "Model Comparison (Difference Tests)",
+            "Note: ΔCFI ≥ −.010 supports invariance (Cheung & Rensvold, 2002); ΔRMSEA ≤ .015 (Chen, 2007).")
+        s13 += _html_badge("ok", f"Highest invariance level achieved: <b>{inv_level}</b>. "
+            "Configural = same structure; Metric = equal loadings; Scalar = equal intercepts.")
+        sections.append(_html_section(13, "Measurement Invariance", s13))
+
+    # ── 14. Model Comparison ─────────────────────────────────────
+    if comp_results and isinstance(comp_results, dict):
+        valid = {k:v for k,v in comp_results.items() if isinstance(v,dict) and "error" not in v}
+        if valid:
+            aic_vals = {k: _safe_float(v.get("aic")) for k,v in valid.items() if _safe_float(v.get("aic"))}
+            min_aic  = min(aic_vals.values()) if aic_vals else None
+            comp_rows = []
+            for name, fit in valid.items():
+                aic = _safe_float(fit.get("aic"))
+                bic = _safe_float(fit.get("bic"))
+                d_aic = round(aic - min_aic, 2) if aic and min_aic else "—"
+                is_best = name == best_model
+                comp_rows.append([
+                    f'<b style="color:{"#1a7a4a" if is_best else "#1a1a1a"}">{name}{"  ✅ Best" if is_best else ""}</b>',
+                    _fmt(_safe_float(fit.get("rmsea")),3),
+                    _fmt(_safe_float(fit.get("cfi")),3),
+                    _fmt(aic,1) if aic else "—",
+                    _fmt(bic,1) if bic else "—",
+                    str(d_aic),
                 ])
-        inv_content  = tbl(["Model","CFI","RMSEA","SRMR"], inv_rows)
-        inv_content += tbl(["Comparison","Delta chi2","Delta CFI","Delta RMSEA","Invariance"],
-            diff_rows,
-            "Note: Delta CFI >= -.010 supports invariance (Cheung & Rensvold, 2002). "
-            f"Highest level achieved: {inv_level}.")
-        s11 = section("11. Measurement Invariance", inv_content)
+            s14 = _html_tbl(["Model","RMSEA","CFI","AIC","BIC","ΔAIC"], comp_rows,
+                "Model Fit Comparison",
+                "Note: Lower AIC/BIC = better fit. ΔAIC ≤ 2 = substantial support; > 10 = no support (Burnham & Anderson, 2002).")
+            s14 += _html_badge("ok", f"Recommended model: <b>{best_model}</b>. "
+                "Model selection should always be guided by theoretical considerations.")
+            sections.append(_html_section(14, "Model Comparison", s14))
 
-    # 12. APA Narrative
-    narrative_html = narrative.replace("\n", "<br>").replace("=","&#61;")
-    s12 = section("12. APA Results Narrative",
-        f'<pre style="background:#f8fafc;padding:16px;border-radius:6px;'
-        f'font-family:Georgia,serif;font-size:0.88rem;line-height:1.7;'
-        f'white-space:pre-wrap;border:1px solid #dde3ea">{narrative}</pre>',
-        color="#555"
+    # ── 15. Path Diagram ─────────────────────────────────────────
+    try:
+        from modules.visualization import build_path_diagram
+        sem_paths_data = ss.get("sem_paths", [])
+        r2_data        = ss.get("sem_r2", [])
+        fig = build_path_diagram(
+            constructs       = constructs,
+            structural_paths = struct_paths,
+            sem_paths        = sem_paths_data,
+            cfa_loadings     = cfa_loadings,
+            r2_data          = r2_data,
+            show_indicators  = True,
+        )
+        svg_bytes = fig.to_image(format="svg")
+        svg_str   = svg_bytes.decode("utf-8")
+        s15 = (
+            f'<div style="text-align:center;margin:16px 0">{svg_str}</div>'
+            f'<p style="font-size:0.78rem;color:#666;text-align:center">'
+            f'Figure 1. SEM Path Diagram. Green = significant positive path; '
+            f'Red = significant negative path; Gray dashed = non-significant. '
+            f'* p < .05; ** p < .01; *** p < .001. Numbers on paths = standardized β.</p>'
+        )
+        sections.append(_html_section(15, "SEM Path Diagram", s15))
+    except Exception as e:
+        sections.append(_html_section(15, "SEM Path Diagram",
+            f'<p style="color:#888">Path diagram not available: {str(e)}</p>'))
+
+    # ── 16. Methodological Checklist ─────────────────────────────
+    check_rows = []
+    check_items = {
+        "Data uploaded and validated":           ss.get("df_ready",False),
+        "Normality tested, estimator selected":  "recommended_estimator" in ss,
+        "CFA estimated and validated":           "cfa_result" in ss,
+        "Factor loadings ≥ .50":                 _check_loadings(),
+        "AVE ≥ .50 (convergent validity)":       _check_ave(),
+        "CR ≥ .70 (composite reliability)":      _check_cr(),
+        "Cronbach α ≥ .70":                      _check_alpha(),
+        "CFA model fit adequate":                bool(cfa_fit),
+        "SEM estimated":                         "sem_result" in ss,
+        "SEM model fit adequate":                _check_sem_fit(),
+        "Structural paths reported":             bool(sem_paths),
+        "R² reported":                           bool(sem_r2),
+        "Mediation analysis conducted":          bool(med_results),
+        "Moderation analysis conducted":         bool(mod_results),
+        "Measurement invariance tested":         bool(inv_results),
+    }
+    for item, passed in check_items.items():
+        icon  = "✅" if passed else "⬜"
+        color = "#1a7a4a" if passed else "#888"
+        check_rows.append([f'<span style="color:{color}">{icon} {item}</span>'])
+    s16 = _html_tbl(["Check"], check_rows)
+    sections.append(_html_section(16, "Methodological Checklist", s16, color="#555"))
+
+    # ── 17. APA Narrative ────────────────────────────────────────
+    s17 = (
+        f'<pre style="background:#f8fafc;padding:20px;border-radius:6px;'
+        f'font-family:Georgia,serif;font-size:0.87rem;line-height:1.8;'
+        f'white-space:pre-wrap;border:1px solid #dde3ea;color:#1a1a1a">'
+        f'{narrative}'
+        f'</pre>'
+        f'<p style="font-size:0.78rem;color:#888;margin-top:8px">'
+        f'Note: This auto-generated text is a starting point. '
+        f'Review, edit, and supplement with theoretical interpretation before submitting.</p>'
     )
+    sections.append(_html_section(17, "APA Results Narrative", s17, color="#555"))
 
-    # ── Assemble full HTML ────────────────────────────────────
-    body = s1 + s2 + s3 + s4 + s5 + s6 + s7 + s8 + s9 + s10 + s11 + s12
+    # ── 18. References ───────────────────────────────────────────
+    refs = [
+        ["Aiken, L. S., & West, S. G. (1991).", "Multiple regression: Testing and interpreting interactions. Sage."],
+        ["Burnham, K. P., & Anderson, D. R. (2002).", "Model selection and multimodel inference (2nd ed.). Springer."],
+        ["Chen, F. F. (2007).", "Sensitivity of goodness of fit indexes to lack of measurement invariance. Structural Equation Modeling, 14(3), 464–504."],
+        ["Cheung, G. W., & Rensvold, R. B. (2002).", "Evaluating goodness-of-fit indexes for testing measurement invariance. Structural Equation Modeling, 9(2), 233–255."],
+        ["Cohen, J. (1988).", "Statistical power analysis for the behavioral sciences (2nd ed.). Lawrence Erlbaum."],
+        ["Fornell, C., & Larcker, D. F. (1981).", "Evaluating structural equation models with unobservable variables and measurement error. Journal of Marketing Research, 18(1), 39–50."],
+        ["Hair, J. F., Black, W. C., Babin, B. J., & Anderson, R. E. (2019).", "Multivariate data analysis (8th ed.). Cengage."],
+        ["Hayes, A. F. (2018).", "Introduction to mediation, moderation, and conditional process analysis (2nd ed.). Guilford Press."],
+        ["Henseler, J., Ringle, C. M., & Sarstedt, M. (2015).", "A new criterion for assessing discriminant validity in variance-based structural equation modeling. Journal of the Academy of Marketing Science, 43(1), 115–135."],
+        ["Hu, L., & Bentler, P. M. (1999).", "Cutoff criteria for fit indexes in covariance structure analysis. Structural Equation Modeling, 6(1), 1–55."],
+        ["Kline, R. B. (2016).", "Principles and practice of structural equation modeling (4th ed.). Guilford Press."],
+        ["Nunnally, J. C. (1978).", "Psychometric theory (2nd ed.). McGraw-Hill."],
+        ["Rosseel, Y. (2012).", "lavaan: An R package for structural equation modeling. Journal of Statistical Software, 48(2), 1–36."],
+        ["Vandenberg, R. J., & Lance, C. E. (2000).", "A review and synthesis of the measurement invariance literature. Organizational Research Methods, 3(1), 4–70."],
+        ["Zhao, X., Lynch, J. G., & Chen, Q. (2010).", "Reconsidering Baron and Kenny: Myths and truths about mediation analysis. Journal of Consumer Research, 37(2), 197–206."],
+    ]
+    ref_html = "".join(
+        f'<p style="margin:6px 0;font-size:0.85rem"><b>{r[0]}</b> {r[1]}</p>'
+        for r in refs
+    )
+    sections.append(_html_section(18, "References", ref_html, color="#555"))
+
+    # ── Assemble HTML ─────────────────────────────────────────────
+    body = "\n".join(sections)
+
+    # TOC
+    toc_items = [
+        "Study Overview", "Model Specification", "Descriptive Statistics",
+        "EFA Results", "CFA Model Fit", "Factor Loadings",
+        "Reliability and Validity", "SEM Model Fit", "Structural Paths",
+        "Explained Variance", "Mediation Analysis", "Moderation Analysis",
+        "Measurement Invariance", "Model Comparison", "Path Diagram",
+        "Checklist", "APA Narrative", "References",
+    ]
+    toc_html = '<div style="background:#f8fafc;border:1px solid #dde3ea;border-radius:8px;padding:16px 20px;margin:20px 0">'
+    toc_html += '<h3 style="color:#2E86AB;margin:0 0 10px 0;font-size:1rem">Table of Contents</h3>'
+    toc_html += '<ol style="margin:0;padding-left:20px;column-count:2;column-gap:20px;font-size:0.85rem">'
+    for i, title in enumerate(toc_items, 1):
+        toc_html += f'<li style="margin:3px 0">{i}. {title}</li>'
+    toc_html += '</ol></div>'
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SEM Studio Report</title>
+<title>SEM Studio Report - {now}</title>
 <style>
-  body {{ font-family: 'Segoe UI', Arial, sans-serif; max-width: 960px; margin: 40px auto;
-         padding: 0 24px; color: #1a1a1a; background: #fff; line-height: 1.6; }}
-  h1   {{ color: #2E86AB; border-bottom: 3px solid #2E86AB; padding-bottom: 10px; }}
-  h2   {{ margin-top: 32px; }}
+  * {{ box-sizing: border-box; }}
+  body {{
+    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    max-width: 1000px;
+    margin: 40px auto;
+    padding: 0 32px 60px;
+    color: #1a1a1a;
+    background: #ffffff;
+    line-height: 1.65;
+    font-size: 14px;
+  }}
+  h1 {{
+    color: #2E86AB;
+    border-bottom: 3px solid #2E86AB;
+    padding-bottom: 12px;
+    font-size: 1.8rem;
+    margin-bottom: 4px;
+  }}
+  h2 {{ font-size: 1.15rem; }}
   table {{ page-break-inside: avoid; }}
-  th   {{ padding: 8px 12px; text-align: left; }}
-  td   {{ vertical-align: top; }}
+  th {{ padding: 8px 14px; text-align: left; font-weight: 600; }}
+  a {{ color: #2E86AB; }}
   @media print {{
-    body {{ margin: 20px; }}
+    body {{ margin: 20px; padding: 0 20px; }}
     .no-print {{ display: none; }}
+    h2 {{ page-break-before: always; }}
+    h2:first-of-type {{ page-break-before: avoid; }}
   }}
 </style>
 </head>
 <body>
 <h1>SEM Studio Analysis Report</h1>
-<p style="color:#888;font-size:0.85rem">Generated: {now} &nbsp;|&nbsp; R/lavaan Backend &nbsp;|&nbsp; n = {n}</p>
-<hr style="border-color:#dde3ea">
+<p style="color:#888;font-size:0.82rem;margin-top:4px">
+  Generated: {now} &nbsp;|&nbsp; Powered by R/lavaan (Rosseel, 2012) &nbsp;|&nbsp; n = {n}
+</p>
+<hr style="border:none;border-top:1px solid #dde3ea;margin:16px 0">
+{toc_html}
 {body}
-<hr style="border-color:#dde3ea;margin-top:40px">
-<p style="color:#aaa;font-size:0.78rem;text-align:center">
-  SEM Studio &mdash; Powered by R/lavaan &mdash; 
-  References: Hair et al. (2019); Kline (2016); Hu &amp; Bentler (1999); Rosseel (2012)
+<hr style="border:none;border-top:1px solid #dde3ea;margin:40px 0 16px">
+<p style="color:#aaa;font-size:0.75rem;text-align:center">
+  SEM Studio &mdash; Open Source SEM Analysis Suite &mdash;
+  Powered by R/lavaan &mdash; Generated {now}
 </p>
 </body>
 </html>"""
@@ -900,45 +1005,49 @@ def generate_html_report() -> str:
 def render_html_export():
     st.subheader("Export HTML Report")
     st.markdown(
-        "Download a complete, publication-ready HTML report. "
+        "Download a complete, publication-ready HTML report containing all results, "
+        "interpretations, path diagram, and APA narrative. "
         "Open in browser, print to PDF, or copy-paste into Word."
     )
 
-    if st.button("Generate HTML Report", type="primary", key="export_html_btn"):
-        with st.spinner("Generating HTML report..."):
+    col1, col2, col3 = st.columns(3)
+    col1.markdown("✅ **All results** in one file")
+    col2.markdown("✅ **Path diagram** embedded")
+    col3.markdown("✅ **Print to PDF** ready")
+
+    if st.button("Generate HTML Report", type="primary", key="export_html_btn", use_container_width=True):
+        with st.spinner("Generating comprehensive HTML report..."):
             try:
                 html = generate_html_report()
-                from datetime import datetime
                 fname = f"SEM_Studio_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.html"
                 st.download_button(
                     label="Download HTML Report",
                     data=html.encode("utf-8"),
                     file_name=fname,
                     mime="text/html",
-                    key="dl_html_btn"
+                    key="dl_html_btn",
+                    use_container_width=True,
                 )
-                badge("excellent", "HTML report ready! Open in browser to view, print to PDF, or copy-paste into Word.")
+                badge("excellent",
+                    "HTML report ready! "
+                    "Open in browser to view | Print > Save as PDF | Select All > Copy > Paste into Word."
+                )
             except Exception as e:
                 st.error(f"HTML generation failed: {str(e)}")
+                import traceback
+                st.code(traceback.format_exc())
 
-
-
-# ── SECTION 4: QUICK TEXT ────────────────────────────────────────
 
 def render_text_export():
     st.subheader("Quick Text Summary")
-    st.markdown("Plain text summary — easy to paste into any document or email.")
-
     ss    = st.session_state
     lines = []
-
-    cfa_fit = ss.get("cfa_fit", {})
+    cfa_fit  = ss.get("cfa_fit", {})
     if cfa_fit:
         lines.append("CFA FIT:")
         for k in ["rmsea","cfi","tli","srmr","aic","bic"]:
             v = _safe_float(cfa_fit.get(k))
-            if v: lines.append(f"  {k.upper()} = {v:.3f}")
-
+            if v is not None: lines.append(f"  {k.upper()} = {v:.3f}")
     sem_paths = ss.get("sem_paths", [])
     if sem_paths:
         lines.append("\nSTRUCTURAL PATHS:")
@@ -946,11 +1055,7 @@ def render_text_export():
             beta  = _safe_float(p.get("beta"))
             p_val = _safe_float(p.get("p"))
             if beta is not None:
-                lines.append(
-                    f"  H{i+1}: {p.get('predictor','?')} -> {p.get('outcome','?')}: "
-                    f"beta = {beta:.3f}, p = {_fmt(p_val, 3)}"
-                )
-
+                lines.append(f"  H{i+1}: {p.get('predictor','?')} -> {p.get('outcome','?')}: beta = {beta:.3f}, p = {_fmt(p_val,3)}")
     med = ss.get("mediation_results", {})
     if med and isinstance(med, dict):
         indirect_data = med.get("indirect", {})
@@ -960,33 +1065,23 @@ def render_text_export():
             ci_hi    = _safe_float(indirect_data.get("ci_hi"))
             if indirect is not None:
                 lines.append(f"\nMEDIATION:")
-                lines.append(
-                    f"  Indirect = {indirect:.4f}, "
-                    f"95% CI [{_fmt(ci_lo, 4)}, {_fmt(ci_hi, 4)}]"
-                )
-
+                lines.append(f"  Indirect = {indirect:.4f}, 95% CI [{_fmt(ci_lo,4)}, {_fmt(ci_hi,4)}]")
     text = "\n".join(lines) if lines else "No results yet. Run analyses first."
     st.text_area("Results Summary", value=text, height=250, key="text_export_area")
 
 
-# ── MAIN RENDER ───────────────────────────────────────────────────
-
 def render_export():
     st.title("Export Report")
-    st.markdown(
-        "Generate and download your complete SEM analysis report. "
-        "All results from every module are compiled into publication-ready outputs."
-    )
+    st.markdown("Generate and download your complete SEM analysis report.")
 
     if not st.session_state.get("df_ready"):
         st.warning("Please complete Data Input and Model Setup first.")
         return
 
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    tab1, tab2, tab3, tab4 = st.tabs([
         "Checklist",
         "APA Narrative",
         "HTML Report",
-        "Excel Export",
         "Quick Text",
     ])
 
@@ -997,6 +1092,4 @@ def render_export():
     with tab3:
         render_html_export()
     with tab4:
-        render_excel_export()
-    with tab5:
         render_text_export()
