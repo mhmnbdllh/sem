@@ -358,7 +358,7 @@ def render_correlation_matrix(df, indicator_cols):
         from utils.apa_tables import correlation_table
         apa_corr = correlation_table(df, indicator_cols)
         st.dataframe(apa_corr, use_container_width=True)
-        st.caption("Note: * p < .05;  p < .01; * p < .001")
+        st.caption("Note: * p < .05; ** p < .01; *** p < .001")
 
     # Multicollinearity check
     high = [(indicator_cols[i], indicator_cols[j], corr.iloc[i,j])
