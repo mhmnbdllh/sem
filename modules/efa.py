@@ -142,18 +142,14 @@ def render_factor_number(result):
         "Always combine statistical criteria with theoretical justification."
     )
 
-    # Show parallel analysis suggestion as info only
-    # Widget uses current session value or suggestion as default
-    current = st.session_state.get("efa_n_factors_widget", suggested)
-    n_factors = st.number_input(
-        "Number of factors to extract:",
-        min_value=1,
-        max_value=20,
-        value=int(current),
-        step=1,
-        key="efa_n_factors_widget"
+    # Display suggestion only - user already set n_factors in Step 2 before Run EFA
+    n_factors = int(st.session_state.get("efa_n_factors_widget", suggested))
+    st.info(
+        f"Factors extracted: {n_factors} "
+        f"(parallel analysis suggested: {suggested}). "
+        f"To change, update Step 2 above and click Run EFA again."
     )
-    return int(n_factors)
+    return n_factors
 
 
 def render_loadings_table(result, item_names, n_factors):
