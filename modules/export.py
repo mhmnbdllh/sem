@@ -562,10 +562,15 @@ def generate_excel():
                 )
 
             # Sheet 9: APA Narrative
+            # Write manually using openpyxl to prevent = being treated as formula
             narrative = generate_apa_narrative()
-            pd.DataFrame({"APA Results Section": [narrative]}).to_excel(
-                writer, sheet_name="APA Narrative", index=False
-            )
+            apa_ws = writer.book.create_sheet("APA Narrative")
+            apa_ws.cell(row=1, column=1, value="APA Results Section")
+            # Prefix with space to prevent Excel treating = as formula
+            cell = apa_ws.cell(row=2, column=1)
+            cell.value = narrative
+            cell.data_type = "s"  # force string type
+            apa_ws.column_dimensions["A"].width = 120
 
         return buf.getvalue(), None
 
