@@ -417,7 +417,9 @@ def render_structural_paths(result, structural_paths):
     ))
     fig.add_vline(x=0, line_color="#555", line_width=1)
     fig.update_layout(
-        template="simple_white", height=max(280, len(path_results)*55+100),
+        template="simple_white", height=max(280, len(path_results,
+        margin=dict(t=60, b=40, l=40, r=120),
+    )*55+100),
         title="Standardized Path Coefficients (beta)",
         xaxis_title="Standardized Coefficient (beta)",
         xaxis=dict(range=[-1, 1]),
@@ -484,7 +486,9 @@ def render_r_squared(result, endogenous):
             fig.add_hline(y=0.13, line_dash="dash", line_color="#b7770d", annotation_text="Moderate (.13)")
             fig.add_hline(y=0.02, line_dash="dot",  line_color="#c0392b", annotation_text="Weak (.02)")
             fig.update_layout(
-                height=350, yaxis=dict(range=[0, 1]),
+                height=350, yaxis=dict(range=[0, 1],
+        margin=dict(t=60, b=40, l=40, r=120),
+    ),
                 font_color="#1a1a1a",
                 plot_bgcolor="#ffffff",
                 paper_bgcolor="#ffffff",
