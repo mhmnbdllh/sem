@@ -383,14 +383,8 @@ def render_moderation():
         if (vars_stored.get("x") == x_var and
             vars_stored.get("w") == w_var and
             vars_stored.get("y") == y_var):
-            result  = st.session_state["moderation_results"]
-            b3      = _safe_float(result.get("b3"))
-            b3_p    = _safe_float(result.get("b3_p"))
-            delta_r2= _safe_float(result.get("delta_r2"))
             st.info("Showing previously computed results. Click the button above to re-run.")
-            if b3 is not None and b3_p is not None and delta_r2 is not None:
-                r = interpret_moderation(b3, b3_p, delta_r2, x_var, w_var, y_var)
-                badge(r["level"], r["message"])
+            render_moderation_results(df, constructs, x_var, w_var, y_var, low_sd, high_sd)
 
     st.markdown("---")
     badge("ok", "Moderation analysis complete. Proceed to Measurement Invariance or Export Report.")
