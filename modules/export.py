@@ -219,7 +219,7 @@ def generate_apa_narrative():
         if cfi   is not None: fit_parts.append(f"CFI = {cfi:.3f}")
         if tli   is not None: fit_parts.append(f"TLI = {tli:.3f}")
         if srmr  is not None: fit_parts.append(f"SRMR = {srmr:.3f}")
-        if chi2 and df_:
+        if chi2 is not None and df_:
             lines.append(f"The measurement model demonstrated {verdict}: chi2({int(df_)}) = {chi2:.3f}, p = {_fmt(p_,3)}, {', '.join(fit_parts)}.")
         else:
             lines.append(f"The measurement model demonstrated {verdict}: {', '.join(fit_parts)}.")
@@ -251,7 +251,7 @@ def generate_apa_narrative():
         if cfi   is not None: fit_parts.append(f"CFI = {cfi:.3f}")
         if tli   is not None: fit_parts.append(f"TLI = {tli:.3f}")
         if srmr  is not None: fit_parts.append(f"SRMR = {srmr:.3f}")
-        if chi2 and df_:
+        if chi2 is not None and df_:
             lines.append(f"The full structural model demonstrated {verdict}: chi2({int(df_)}) = {chi2:.3f}, p = {_fmt(p_,3)}, {', '.join(fit_parts)}.")
     if sem_paths:
         lines.append("")
@@ -478,7 +478,7 @@ def generate_html_report():
         n_f     = efa_result.get("n_factors")
         if isinstance(n_f, list): n_f = n_f[0]
         efa_rows = [
-            ["KMO Overall",    _fmt(kmo), "≥ .80 meritorious; ≥ .60 acceptable", _level_badge_html("excellent" if kmo and kmo >= 0.80 else "ok" if kmo and kmo >= 0.60 else "critical", "Meritorious" if kmo and kmo >= 0.80 else "Acceptable" if kmo and kmo >= 0.60 else "Poor")],
+            ["KMO Overall",    _fmt(kmo), "≥ .80 meritorious; ≥ .60 acceptable", _level_badge_html("excellent" if kmo is not None and kmo >= 0.80 else "ok" if kmo is not None and kmo >= 0.60 else "critical", "Meritorious" if kmo is not None and kmo >= 0.80 else "Acceptable" if kmo is not None and kmo >= 0.60 else "Poor")],
             ["Bartlett's p",   "< .001" if bart_p is not None and bart_p < 0.001 else _fmt(bart_p,4), "p < .05 required", _level_badge_html("excellent" if bart_p is not None and bart_p < 0.05 else "critical", "Significant" if bart_p is not None and bart_p < 0.05 else "Not Significant")],
             ["Factors Extracted", str(int(n_f)) if n_f else "—", "Based on parallel analysis", ""],
             ["Rotation",       str(efa_result.get("rotation","—")), "PAF extraction", ""],
@@ -519,7 +519,7 @@ def generate_html_report():
     # chi2/df
     chi2 = _safe_float(cfa_fit.get("chi2"))
     df_  = _safe_float(cfa_fit.get("df"))
-    if chi2 and df_ and float(df_) > 0:
+    if chi2 is not None and df_ and float(df_) > 0:
         ratio = chi2/df_
         level_r = "good" if ratio <= 2 else "ok" if ratio <= 5 else "critical"
         label_r = "Good (≤ 2.0)" if ratio <= 2 else "Acceptable (≤ 5.0)" if ratio <= 5 else "Poor (> 5.0)"
@@ -850,14 +850,14 @@ def generate_html_report():
             r2_data          = r2_data,
             show_indicators  = True,
         )
-        svg_bytes = fig.to_image(format="svg")
-        svg_str   = svg_bytes.decode("utf-8")
+        # Export as interactive HTML snippet (no kaleido needed)
+        fig_html = fig.to_html(full_html=False, include_plotlyjs=False)
         s15 = (
-            f'<div style="text-align:center;margin:16px 0">{svg_str}</div>'
+            f'<div style="margin:16px 0">{fig_html}</div>'
             f'<p style="font-size:0.78rem;color:#666;text-align:center">'
             f'Figure 1. SEM Path Diagram. Green = significant positive path; '
             f'Red = significant negative path; Gray dashed = non-significant. '
-            f'* p < .05; ** p < .01; *** p < .001. Numbers on paths = standardized β.</p>'
+            f'* p &lt; .05; ** p &lt; .01; *** p &lt; .001. Numbers on paths = standardized β.</p>'
         )
         sections.append(_html_section(15, "SEM Path Diagram", s15))
     except Exception as e:
@@ -1021,9 +1021,9 @@ def generate_html_report():
 {toc_html}
 {body}
 <hr style="border:none;border-top:1px solid #dde3ea;margin:40px 0 16px">
-<p style="color:#aaa;font-size:0.95rem;text-align:center">
-  SEM Studio &mdash; Open Source SEM Studio App &mdash;
-  Scripted by Dr. Muhaimin Abdullah, S.Pd., M.Pd. &mdash; Generated {now}
+<p style="color:#aaa;font-size:0.75rem;text-align:center">
+  SEM Studio &mdash; Open Source SEM Analysis Suite &mdash;
+  Powered by R/lavaan &mdash; Generated {now}
 </p>
 </body>
 </html>"""
