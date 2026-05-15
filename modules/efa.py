@@ -129,10 +129,9 @@ def render_factor_number(result):
                              annotation_text="Eigenvalue = 1 (Kaiser)")
                 fig.update_layout(
                     height=350, font_color="#1a1a1a",
-                    plot_bgcolor="#ffffff", paper_bgcolor="#ffffff"
-                ,
-        margin=dict(t=60, b=40, l=40, r=120),
-    )
+                    plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
+                    margin=dict(t=60, b=40, l=40, r=120),
+                )
                 st.plotly_chart(fig, use_container_width=True)
 
     c1, c2 = st.columns(2)
