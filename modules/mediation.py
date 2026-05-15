@@ -317,7 +317,9 @@ def render_mediation_results(df, constructs, x_var, m_var, y_var, n_boot, ci_lev
                 fig.add_vline(x=0, line_color="#555", line_dash="dash", line_width=1.5)
                 fig.update_layout(
                     template="simple_white", height=280,
-                    title=f"{int(ci_level*100)}% Bootstrap BCa Confidence Intervals",
+                    title=f"{int(ci_level*100,
+        margin=dict(t=60, b=40, l=40, r=120),
+    )}% Bootstrap BCa Confidence Intervals",
                     xaxis_title="Effect Size (standardized)",
                     font_color="#1a1a1a",
                     plot_bgcolor="#ffffff",
