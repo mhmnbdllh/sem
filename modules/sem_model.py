@@ -485,7 +485,7 @@ def render_r_squared(result, endogenous):
             fig.add_hline(y=0.02, line_dash="dot",  line_color="#c0392b", annotation_text="Weak (.02)")
             fig.update_layout(
                 height=350, yaxis=dict(range=[0, 1.35]),
-        margin=dict(t=60, b=40, l=40, r=120),
+                margin=dict(t=60, b=40, l=40, r=120),
                 font_color="#1a1a1a",
                 plot_bgcolor="#ffffff",
                 paper_bgcolor="#ffffff",
