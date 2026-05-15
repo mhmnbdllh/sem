@@ -351,9 +351,8 @@ def render_correlation_matrix(df, indicator_cols):
         aspect="auto",
     )
     fig.update_layout(
-        height=max(350, len(indicator_cols,
+        height=max(350, len(indicator_cols) * 35),
         margin=dict(t=60, b=40, l=40, r=120),
-    ) * 35),
         font_color="#1a1a1a",
         plot_bgcolor="#ffffff",
         paper_bgcolor="#ffffff",
