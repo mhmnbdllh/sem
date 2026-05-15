@@ -470,9 +470,8 @@ def render_reliability(result, constructs, df):
     fig.update_layout(
         barmode="group", template="simple_white", height=350,
         title="Reliability and Validity Metrics by Construct",
-        yaxis=dict(range=[0, 1.05],
-        margin=dict(t=60, b=40, l=40, r=120),
-    ),
+        yaxis=dict(range=[0, 1.35]),
+        margin=dict(t=60, b=60, l=40, r=40),
         legend=dict(orientation="h", y=-0.2, x=0),
         font_color="#1a1a1a",
         plot_bgcolor="#ffffff",
