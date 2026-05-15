@@ -312,8 +312,10 @@ def render_fit_comparison(result, group1, group2):
         fig.update_layout(
             barmode="group", template="simple_white", height=320,
             title="Fit Indices Across Invariance Models",
-            yaxis=dict(range=[0, 1.05]),
-            legend=dict(orientation="h", y=1.1),
+            yaxis=dict(range=[0, 1.05],
+        margin=dict(t=60, b=40, l=40, r=120),
+    ),
+            legend=dict(orientation="h", y=-0.2, x=0),
             font_color="#1a1a1a",
             plot_bgcolor="#ffffff",
             paper_bgcolor="#ffffff",
