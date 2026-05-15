@@ -130,7 +130,9 @@ def render_factor_number(result):
                 fig.update_layout(
                     height=350, font_color="#1a1a1a",
                     plot_bgcolor="#ffffff", paper_bgcolor="#ffffff"
-                )
+                ,
+        margin=dict(t=60, b=40, l=40, r=120),
+    )
                 st.plotly_chart(fig, use_container_width=True)
 
     c1, c2 = st.columns(2)
@@ -280,7 +282,9 @@ def render_loadings_table(result, item_names, n_factors):
             aspect="auto",
         )
         fig.update_layout(
-            height=max(300, n_factors * 120),
+            height=max(300, n_factors * 120,
+        margin=dict(t=60, b=40, l=40, r=120),
+    ),
             font_color="#1a1a1a",
             plot_bgcolor="#ffffff",
             paper_bgcolor="#ffffff",
