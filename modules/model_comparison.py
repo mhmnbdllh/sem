@@ -399,13 +399,14 @@ def render_information_criteria(fit_results):
             marker_color="#b7770d", opacity=0.85,
         ))
     fig.update_layout(
-        barmode="group", template="simple_white", height=320,
+        barmode="group", template="simple_white", height=340,
         title="AIC and BIC by Model (lower = better)",
         yaxis=dict(range=[min_val, max(aics) * 1.002]),
-        legend=dict(orientation="h", y=1.1),
+        legend=dict(orientation="h", y=-0.2),
         font_color="#1a1a1a",
         plot_bgcolor="#ffffff",
         paper_bgcolor="#ffffff",
+        margin=dict(t=60, b=80, l=40, r=40),
     )
     st.plotly_chart(fig, use_container_width=True)
 
