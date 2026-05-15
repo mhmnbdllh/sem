@@ -321,7 +321,7 @@ def render_moderation_results(df, constructs, x_var, w_var, y_var, low_sd, high_
             ))
 
         fig.update_layout(
-            template="simple_white", height=400,
+            template="simple_white", height=420,
             title=f"Interaction Plot: {x_var} x {w_var} --> {y_var}",
             xaxis_title=f"{x_var} (standardized, mean-centered)",
             yaxis_title=f"{y_var} (standardized)",
@@ -329,6 +329,7 @@ def render_moderation_results(df, constructs, x_var, w_var, y_var, low_sd, high_
             font_color="#1a1a1a",
             plot_bgcolor="#ffffff",
             paper_bgcolor="#ffffff",
+            margin=dict(t=60, b=60, l=60, r=40),
         )
         st.plotly_chart(fig, use_container_width=True)
 
