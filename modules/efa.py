@@ -282,9 +282,8 @@ def render_loadings_table(result, item_names, n_factors):
             aspect="auto",
         )
         fig.update_layout(
-            height=max(300, n_factors * 120,
+            height=max(300, n_factors * 120),
         margin=dict(t=60, b=40, l=40, r=120),
-    ),
             font_color="#1a1a1a",
             plot_bgcolor="#ffffff",
             paper_bgcolor="#ffffff",
