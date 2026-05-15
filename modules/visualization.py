@@ -289,7 +289,7 @@ def render_path_diagram():
     structural_paths = st.session_state.get("structural_paths", [])
     sem_paths        = st.session_state.get("sem_paths", [])
     cfa_loadings     = st.session_state.get("cfa_loadings", {})
-    r2_data          = st.session_state.get("sem_r2", [])
+    r2_data_all      = st.session_state.get("sem_r2", [])
 
     if not constructs:
         st.warning("No constructs defined. Complete Data Input first.")
@@ -308,7 +308,7 @@ def render_path_diagram():
         structural_paths = structural_paths,
         sem_paths        = sem_paths,
         cfa_loadings     = cfa_loadings if show_loadings else {},
-        r2_data          = r2_data if show_r2 else [],
+        r2_data          = r2_data_all if show_r2 else [],
         show_indicators  = show_indicators,
     )
     st.plotly_chart(fig, use_container_width=True)
@@ -387,13 +387,13 @@ def render_fit_dashboard():
                     textposition="outside",
                 ))
                 fig.update_layout(
-                    template="simple_white", height=320,
+                    template="simple_white", height=350,
                     title=f"{label} Fit Indices",
-                    yaxis=dict(range=[0, 1.25]),
+                    yaxis=dict(range=[0, 1.4]),
                     font_color="#1a1a1a",
                     plot_bgcolor="#ffffff",
                     paper_bgcolor="#ffffff",
-                    margin=dict(t=60, b=40),
+                    margin=dict(t=60, b=60, l=40, r=40),
                 )
                 st.plotly_chart(fig, use_container_width=True)
                 st.caption("Green = Good | Orange = Acceptable | Red = Poor")
@@ -485,6 +485,7 @@ def render_construct_correlations():
         font_color="#1a1a1a",
         plot_bgcolor="#ffffff",
         paper_bgcolor="#ffffff",
+        margin=dict(t=60, b=40, l=40, r=80),
     )
     st.plotly_chart(fig, use_container_width=True)
     st.caption(
