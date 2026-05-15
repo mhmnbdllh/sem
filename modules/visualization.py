@@ -217,7 +217,7 @@ def build_path_diagram(constructs, structural_paths,
                 color="#e8f4fc",
                 line=dict(color="#2E86AB", width=2.5),
             ),
-            text=[cname],
+            text=[display_label],
             textposition="middle center",
             textfont=dict(size=11, color="#1a1a1a", family="Arial Black"),
             hovertext=display_label,
@@ -387,12 +387,13 @@ def render_fit_dashboard():
                     textposition="outside",
                 ))
                 fig.update_layout(
-                    template="simple_white", height=280,
+                    template="simple_white", height=320,
                     title=f"{label} Fit Indices",
-                    yaxis=dict(range=[0, 1.1]),
+                    yaxis=dict(range=[0, 1.25]),
                     font_color="#1a1a1a",
                     plot_bgcolor="#ffffff",
                     paper_bgcolor="#ffffff",
+                    margin=dict(t=60, b=40),
                 )
                 st.plotly_chart(fig, use_container_width=True)
                 st.caption("Green = Good | Orange = Acceptable | Red = Poor")
