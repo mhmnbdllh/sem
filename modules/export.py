@@ -851,7 +851,7 @@ def generate_html_report():
             show_indicators  = True,
         )
         # Export as interactive HTML snippet (no kaleido needed)
-        fig_html = fig.to_html(full_html=False, include_plotlyjs=False)
+        fig_html = fig.to_html(full_html=False, include_plotlyjs="cdn")
         s15 = (
             f'<div style="margin:16px 0">{fig_html}</div>'
             f'<p style="font-size:0.78rem;color:#666;text-align:center">'
