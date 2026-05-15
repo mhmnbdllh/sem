@@ -142,7 +142,7 @@ def interpret_path(beta, se, p, predictor=None, outcome=None):
     direction = "positively" if beta > 0 else "negatively"
     if p < SEM["p_significant"]:
         stars = "***" if p < 0.001 else "**" if p < 0.01 else "*"
-        return {"level":"significant","message":f"Path {pred} → {out}: **significant** (β = {beta:.3f}{stars}, SE = {se:.3f}, p = {p:.3f}). {pred.capitalize()} **{direction} predicts** {out}. ✅"}
+        return {"level":"significant","message":f"Path {pred} → {out}: **significant** (β = {beta:.3f}{stars}, SE = {se:.3f}, p = {p:.3f}). {predictor or pred} {direction} predicts {outcome or out}. ✅"}
     elif p < SEM["p_marginal"]:
         return {"level":"marginal","message":f"Path {pred} → {out}: **marginally significant** (β = {beta:.3f}, p = {p:.3f}). ⚠️ Interpret with caution."}
     else:
