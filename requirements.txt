@@ -5,6 +5,5 @@ scipy
 matplotlib
 seaborn
 plotly
-kaleido
 openpyxl
 reportlab
