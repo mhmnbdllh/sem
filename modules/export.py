@@ -195,6 +195,7 @@ def generate_apa_narrative():
         f"The analysis was conducted on a sample of N = {n} participants. "
         f"{est} estimation was used based on Mardia multivariate normality assessment. "
         f"All analyses were performed using SEM Studio (R/lavaan; Rosseel, 2012)."
+        f"Scripted by Dr. Muhaimin Abdullah, S.Pd., M.Pd. (https://muhaiminabdullah.com)"
     )
     lines.append("")
     lines.append("MEASUREMENT MODEL (CFA)")
@@ -414,7 +415,12 @@ def generate_html_report():
         ["Report Generated", now],
     ]
     sections.append(_html_section(1, "Study Overview",
-        _html_tbl(["Item","Value"], overview_rows)))
+        _html_tbl(["Item","Value"], overview_rows) +
+        _html_badge("ok",
+            "This report summarizes a Structural Equation Modeling (SEM) analysis. "
+            "All statistical analyses were conducted using R/lavaan (Rosseel, 2012). "
+            "Interpretation guidelines follow Hair et al. (2019) and Kline (2016)."
+        )))
 
     # ── 2. Construct Definitions ──────────────────────────────────
     const_rows = []
@@ -424,6 +430,11 @@ def generate_html_report():
     s2 = _html_tbl(["Construct","Indicators","n"], const_rows, "Measurement Model")
     if path_rows:
         s2 += _html_tbl(["Hypothesis","Path"], path_rows, "Structural Paths (Hypotheses)")
+    s2 += _html_badge("ok",
+        "The measurement model specifies which indicators belong to each latent construct. "
+        "The structural model specifies the hypothesized directional relationships between constructs. "
+        "Each construct should have at least 3 indicators for model identification."
+    )
     sections.append(_html_section(2, "Model Specification", s2))
 
     # ── 3. Descriptive Statistics ─────────────────────────────────
@@ -489,6 +500,12 @@ def generate_html_report():
         if factor_names:
             fn_rows = [[f, name] for f, name in factor_names.items()]
             s4 += _html_tbl(["Factor","Construct Name"], fn_rows, "Factor Assignments")
+        s4 += _html_badge("ok",
+            "EFA identifies the underlying factor structure empirically. "
+            "KMO ≥ .80 = meritorious; ≥ .60 = acceptable. "
+            "Bartlett's test must be significant (p < .05). "
+            "Factor loadings ≥ .50 are considered acceptable; ≥ .70 are strong."
+        )
         sections.append(_html_section(4, "Exploratory Factor Analysis (EFA)", s4))
 
     # ── 5. CFA Fit Indices ────────────────────────────────────────
@@ -543,6 +560,20 @@ def generate_html_report():
     s6 = _html_tbl(["Construct","Item","Std. Loading (λ)","Status"], load_rows,
         "Standardized Factor Loadings",
         "Note: λ ≥ .70 = strong; λ ≥ .50 = acceptable; λ < .50 = weak (Hair et al., 2019). p < .001 for all significant loadings.")
+    # Add interpretation summary for loadings
+    if load_rows:
+        weak   = sum(1 for r in load_rows if "Weak" in r[3])
+        strong = sum(1 for r in load_rows if "Strong" in r[3])
+        total  = len(load_rows)
+        if weak == 0:
+            s6 += _html_badge("excellent",
+                f"All {total} factor loadings meet the acceptable threshold (λ ≥ .50). "
+                f"{strong} loadings are strong (λ ≥ .70). "
+                "Convergent validity at the item level is supported.")
+        else:
+            s6 += _html_badge("warning",
+                f"{weak} of {total} loadings are weak (λ < .50). "
+                "Consider removing weak items and re-running CFA.")
     sections.append(_html_section(6, "Factor Loadings", s6))
 
     # ── 7. Reliability and Validity ───────────────────────────────
@@ -593,6 +624,21 @@ def generate_html_report():
             s7 += _html_tbl(fl_headers, fl_rows,
                 "Fornell-Larcker Criterion",
                 "Note: Diagonal (*) = sqrt(AVE). Discriminant validity supported when sqrt(AVE) > all off-diagonal correlations in the same row/column.")
+    # Add overall reliability interpretation
+    if rel_rows:
+        all_pass_alpha = all((m.get("alpha") or 0) >= 0.70 for m in metrics.values())
+        all_pass_cr    = all((m.get("cr")    or 0) >= 0.70 for m in metrics.values())
+        all_pass_ave   = all((m.get("ave")   or 0) >= 0.50 for m in metrics.values())
+        if all_pass_alpha and all_pass_cr and all_pass_ave:
+            s7 += _html_badge("excellent",
+                "All constructs demonstrate adequate reliability (α ≥ .70, CR ≥ .70) "
+                "and convergent validity (AVE ≥ .50). "
+                "The Fornell-Larcker criterion should also be checked: "
+                "sqrt(AVE) of each construct should exceed its correlations with all other constructs.")
+        else:
+            s7 += _html_badge("warning",
+                "One or more constructs do not meet reliability or validity thresholds. "
+                "Review items with low loadings and consider scale refinement.")
     sections.append(_html_section(7, "Reliability and Validity", s7))
 
     # ── 8. SEM Fit Indices ────────────────────────────────────────
@@ -649,6 +695,17 @@ def generate_html_report():
         "Note: β = standardized path coefficient. * p < .05; ** p < .01; *** p < .001. "
         "Cohen's f²: ≥ .02 small; ≥ .15 medium; ≥ .35 large (Cohen, 1988)."
     )
+    # Add overall path interpretation
+    if path_rows_html:
+        supported   = sum(1 for p in sem_paths if (_safe_float(p.get("p")) or 1) < 0.05)
+        total_paths = len(sem_paths)
+        s9 += _html_badge(
+            "excellent" if supported == total_paths else "ok" if supported > 0 else "warning",
+            f"{supported} of {total_paths} hypothesized path(s) are statistically significant (p < .05). "
+            "Significant paths support the hypothesized relationships. "
+            "Note: * p &lt; .05; ** p &lt; .01; *** p &lt; .001. "
+            "Beta = standardized path coefficient; larger absolute values indicate stronger effects."
+        )
     sections.append(_html_section(9, "Structural Path Coefficients", s9))
 
     # ── 10. R-Squared ─────────────────────────────────────────────
@@ -668,6 +725,13 @@ def generate_html_report():
     s10 = _html_tbl(["Construct","R²","R² (%)","Level"], r2_rows_html,
         "Explained Variance (R²) for Endogenous Constructs",
         "Note: R² ≥ .26 = substantial; ≥ .13 = moderate; ≥ .02 = weak (Cohen, 1988).")
+    if r2_rows_html:
+        s10 += _html_badge("ok",
+            "R² indicates the proportion of variance in each endogenous construct "
+            "explained by its predictors. "
+            "Benchmarks: R² ≥ .26 = substantial; ≥ .13 = moderate; ≥ .02 = weak (Cohen, 1988). "
+            "Higher R² indicates the model explains more variance in the outcome construct."
+        )
     sections.append(_html_section(10, "Explained Variance (R²)", s10))
 
     # ── 11. Mediation ─────────────────────────────────────────────
@@ -726,7 +790,8 @@ def generate_html_report():
         s11 = _html_tbl(["Effect","β","95% BCa CI","Significance"], med_rows_html,
             f"Bootstrap Mediation: {x} → {m_v} → {y}",
             f"Note: {med_results.get('n_boot',5000):,}-resample bootstrap via R/lavaan. "
-            "Significance criterion: 95% BCa CI not containing zero.")
+            "Significance criterion: 95% BCa CI not containing zero. "
+            "* p &lt; .05; ** p &lt; .01; *** p &lt; .001 for direct and total effects.")
         s11 += _html_badge(med_level, f"<b>{med_type}</b>: indirect = {_fmt(ind,4)}, "
             f"95% BCa CI [{_fmt(cilo,4)}, {_fmt(cihi,4)}].{vaf_str}")
         sections.append(_html_section(11, f"Mediation Analysis ({x} → {m_v} → {y})", s11))
@@ -746,7 +811,10 @@ def generate_html_report():
             [f"<b>{x} × {w}</b> (Int.)",_fmt(b3), _fmt(_safe_float(mod_results.get("b3_se"))), _fmt(b3_p,4), _stars(b3_p), _level_badge_html("ok" if b3_p is not None and b3_p < 0.05 else "warning", "Significant ✅" if b3_p is not None and b3_p < 0.05 else "Not Significant")],
         ]
         s12 = _html_tbl(["Term","β","SE","p","Sig.","Interpretation"], mod_coef_rows,
-            f"Moderation Analysis: {x} × {w} → {y}")
+            f"Moderation Analysis: {x} × {w} → {y}",
+            "Note: * p &lt; .05; ** p &lt; .01; *** p &lt; .001. "
+            "Variables are mean-centered before computing the interaction term (Aiken & West, 1991). "
+            "A significant interaction term (X × W) indicates moderation.")
         s12 += _html_tbl(
             ["Model","R²","ΔR²"],
             [[f"Model 1: {x} + {w}", _fmt(r2_1), "—"],
@@ -888,6 +956,14 @@ def generate_html_report():
         color = "#1a7a4a" if passed else "#888"
         check_rows.append([f'<span style="color:{color}">{icon} {item}</span>'])
     s16 = _html_tbl(["Check"], check_rows)
+    passed = sum(1 for _, passed in check_items.items() if passed)
+    total_c = len(check_items)
+    pct_c   = passed / total_c if total_c > 0 else 0
+    s16 += _html_badge(
+        "excellent" if pct_c >= 0.90 else "ok" if pct_c >= 0.70 else "warning",
+        f"Methodological completeness: {passed}/{total_c} steps completed ({pct_c:.0%}). "
+        f"{'All major methodological requirements are met.' if pct_c >= 0.90 else 'Consider completing remaining analyses before publication.'}"
+    )
     sections.append(_html_section(16, "Methodological Checklist", s16, color="#555"))
 
     # ── 17. APA Narrative ────────────────────────────────────────
