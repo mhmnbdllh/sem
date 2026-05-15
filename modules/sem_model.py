@@ -418,7 +418,6 @@ def render_structural_paths(result, structural_paths):
     fig.add_vline(x=0, line_color="#555", line_width=1)
     fig.update_layout(
         template="simple_white", height=max(280, len(path_results)*55+100),
-        margin=dict(t=60, b=40, l=40, r=120),
         title="Standardized Path Coefficients (beta)",
         xaxis_title="Standardized Coefficient (beta)",
         xaxis=dict(range=[-1, 1]),
