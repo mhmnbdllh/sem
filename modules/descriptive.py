@@ -183,7 +183,9 @@ def render_missing_analysis(df, indicator_cols):
     )
     fig.add_hline(y=5,  line_dash="dash", line_color="#b7770d", annotation_text="5% threshold")
     fig.add_hline(y=10, line_dash="dash", line_color="#c0392b", annotation_text="10% critical")
-    fig.update_layout(height=320, font_color="#1a1a1a", plot_bgcolor="#ffffff", paper_bgcolor="#ffffff")
+    fig.update_layout(height=320, font_color="#1a1a1a", plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
+        margin=dict(t=60, b=40, l=40, r=120),
+    )
     st.plotly_chart(fig, use_container_width=True)
 
     st.dataframe(missing_df, use_container_width=True, hide_index=True)
@@ -262,7 +264,9 @@ def render_outlier_detection(df, indicator_cols):
             )
             fig.add_hline(y=chi2_crit, line_dash="dash", line_color="#c0392b",
                          annotation_text=f"Critical value (p=.001) = {chi2_crit:.2f}")
-            fig.update_layout(height=320, font_color="#1a1a1a", plot_bgcolor="#ffffff", paper_bgcolor="#ffffff")
+            fig.update_layout(height=320, font_color="#1a1a1a", plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
+        margin=dict(t=60, b=40, l=40, r=120),
+    )
             st.plotly_chart(fig, use_container_width=True)
             st.session_state["mv_outliers"] = list(plot_df[outlier_flag]["Respondent"])
         except Exception as e:
@@ -347,7 +351,9 @@ def render_correlation_matrix(df, indicator_cols):
         aspect="auto",
     )
     fig.update_layout(
-        height=max(350, len(indicator_cols) * 35),
+        height=max(350, len(indicator_cols,
+        margin=dict(t=60, b=40, l=40, r=120),
+    ) * 35),
         font_color="#1a1a1a",
         plot_bgcolor="#ffffff",
         paper_bgcolor="#ffffff",
@@ -410,7 +416,9 @@ def render_harman_test(df, indicator_cols):
                     fig = px.line(ev_df, x="Factor", y="Eigenvalue", markers=True,
                                  template="simple_white", title="Eigenvalue Scree Plot (Harman's Test)")
                     fig.add_hline(y=1, line_dash="dash", line_color="#b7770d", annotation_text="Eigenvalue = 1")
-                    fig.update_layout(height=300, font_color="#1a1a1a", plot_bgcolor="#ffffff", paper_bgcolor="#ffffff")
+                    fig.update_layout(height=300, font_color="#1a1a1a", plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
+        margin=dict(t=60, b=40, l=40, r=120),
+    )
                     st.plotly_chart(fig, use_container_width=True)
                 return
 
