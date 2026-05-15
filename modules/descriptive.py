@@ -415,9 +415,7 @@ def render_harman_test(df, indicator_cols):
                     fig = px.line(ev_df, x="Factor", y="Eigenvalue", markers=True,
                                  template="simple_white", title="Eigenvalue Scree Plot (Harman's Test)")
                     fig.add_hline(y=1, line_dash="dash", line_color="#b7770d", annotation_text="Eigenvalue = 1")
-                    fig.update_layout(height=300, font_color="#1a1a1a", plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
-        margin=dict(t=60, b=40, l=40, r=120),
-    )
+                    fig.update_layout(height=300, font_color="#1a1a1a", plot_bgcolor="#ffffff", paper_bgcolor="#ffffff", margin=dict(t=60, b=40, l=40, r=40))
                     st.plotly_chart(fig, use_container_width=True)
                 return
 
