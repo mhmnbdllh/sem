@@ -375,21 +375,64 @@ def render_factor_naming_setup(n_factors_expected):
 
 def render_factor_naming(loadings_mat, n_factors):
     """
-    Step shown AFTER Run EFA — displays factor loading table with assigned names.
-    Names already set in render_factor_naming_setup().
+    Step shown AFTER seeing factor loading results.
+    User assigns construct names based on which items load on each factor.
     """
-    st.subheader("Step 6: Factor Assignment Summary")
-    st.markdown("Factor names assigned in Step 3b, shown here with loading results.")
+    st.subheader("Step 6: Assign Construct Names to Factors")
+    st.markdown(
+        "Based on the loading matrix above, assign a construct name to each factor. "
+        "Look at which items load highest on each factor, then select the matching construct. "
+        "Use the same names as defined in Data Input."
+    )
 
-    factor_cols  = [f"F{i+1}" for i in range(n_factors) if f"F{i+1}" in loadings_mat.columns]
-    factor_names = st.session_state.get("efa_factor_names", {})
+    constructs      = st.session_state.get("constructs", {})
+    construct_names = list(constructs.keys())
+    factor_cols     = [f"F{i+1}" for i in range(n_factors) if f"F{i+1}" in loadings_mat.columns]
 
-    for f in factor_cols:
-        name      = factor_names.get(f, f)
-        top_items = loadings_mat[f].abs().nlargest(5).index.tolist()
-        st.markdown(f"**{f} → {name}:** top items: " +
-                    ", ".join([f"{item} (λ={loadings_mat.loc[item,f]:.3f})" for item in top_items]))
+    if construct_names:
+        reminder_lines = ["Constructs from Data Input (for reference):"]
+        for cname, items in constructs.items():
+            reminder_lines.append(f"  - {cname}: {', '.join(items)}")
+        st.info("\n".join(reminder_lines))
 
+    OPTIONS      = construct_names + ["[ Custom name... ]"]
+    factor_names = {}
+
+    for i, f in enumerate(factor_cols):
+        top_items = loadings_mat[f].abs().nlargest(3).index.tolist()
+        top_str   = ", ".join([f"{item} (λ={loadings_mat.loc[item,f]:.3f})" for item in top_items])
+
+        c1, c2 = st.columns([2, 3])
+        with c1:
+            saved       = st.session_state.get(f"efa_fname_{f}", "")
+            default_idx = construct_names.index(saved) if saved in construct_names else min(i, max(0, len(construct_names)-1))
+            selected    = st.selectbox(
+                f"{f} name",
+                options=OPTIONS,
+                index=default_idx,
+                key=f"efa_fname_{f}",
+            )
+            if selected == "[ Custom name... ]":
+                prev   = saved if saved and saved not in construct_names else ""
+                custom = st.text_input(f"Custom name for {f}", value=prev, key=f"efa_custom_{f}")
+                name   = custom.strip() if custom.strip() else f"Factor{i+1}"
+            else:
+                name = selected
+        with c2:
+            st.markdown(f"**Top items loading on {f}:** {top_str}")
+
+        factor_names[f] = name
+        st.session_state[f"efa_fname_{f}"] = name
+
+    values = list(factor_names.values())
+    if len(set(values)) < len(values):
+        badge("warning", "Duplicate names detected. Each factor should have a unique name.")
+    elif all(v in construct_names for v in values):
+        badge("ok", "All factor names match Data Input constructs. Consistency ensured.")
+    else:
+        badge("ok", "Factor names set. Ensure custom names are consistent with structural paths.")
+
+    st.session_state["efa_factor_names"] = factor_names
     return factor_names
 
 
@@ -504,7 +547,6 @@ def render_efa():
         "You can change this after seeing the scree plot — but that requires running EFA again."
     )
 
-    factor_names_setup = render_factor_naming_setup(int(n_factors_setup))
     st.markdown("---")
 
     if st.button("Run EFA via R/psych", type="primary", key="run_efa_btn"):
