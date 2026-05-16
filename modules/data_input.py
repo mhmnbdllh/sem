@@ -215,7 +215,9 @@ def render_construct_definition(df, assignments):
         c1, c2 = st.columns([1, 3])
         with c1:
             default_name = f"Construct{i+1}"
-        name = st.text_input(f"Construct {i+1} name", value=st.session_state.get(f"construct_name_{i}", default_name), key=f"construct_name_{i}")
+        if f"construct_name_{i}" not in st.session_state:
+            st.session_state[f"construct_name_{i}"] = default_name
+        name = st.text_input(f"Construct {i+1} name", key=f"construct_name_{i}")
         with c2:
             selected = st.multiselect(f"Indicators for {name}", options=indicator_cols, key=f"construct_items_{i}")
         if name and selected:
