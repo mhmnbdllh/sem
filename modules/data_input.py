@@ -283,9 +283,31 @@ def render_data_input():
         st.session_state["structural_paths"] = paths
     st.markdown("---")
     if constructs:
-        options = render_advanced_options(constructs)
+        options = render_advanced_options(constructs, paths)
         st.session_state["advanced_options"] = options
+        # Update paths after auto-add from mediation/moderation setup
+        st.session_state["structural_paths"] = paths
     st.markdown("---")
+    # Model Preview
+    if constructs and paths:
+        st.markdown("---")
+        st.subheader("Model Preview")
+        st.markdown("Review your model before proceeding:")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("**Measurement Model:**")
+            for cname, items in constructs.items():
+                st.markdown(f"- **{cname}**: {', '.join(items)}")
+        with col2:
+            st.markdown("**Structural Paths:**")
+            for i, (pred, out) in enumerate(paths, 1):
+                st.markdown(f"- H{i}: {pred} → {out}")
+        adv = st.session_state.get("advanced_options", {})
+        if adv.get("has_mediation"):
+            st.markdown(f"**Mediation:** {adv.get('mediator_x')} → {adv.get('mediator_m')} → {adv.get('mediator_y')}")
+        if adv.get("has_moderation"):
+            st.markdown(f"**Moderation:** {adv.get('mod_x')} × {adv.get('mod_w')} → {adv.get('mod_y')}")
+
     if constructs:
         if st.button("Confirm Model Setup and Proceed", type="primary", use_container_width=True, key="confirm_setup_btn"):
             st.session_state["df"]       = df
