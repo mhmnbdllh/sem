@@ -297,13 +297,30 @@ def render_data_input():
     if df is None:
         return
 
-    # Add Reset Session button in sidebar-like area
+    # Add Reset Session button
     with st.expander("🔄 Session Management", expanded=False):
         st.markdown("Start a completely new analysis:")
         if st.button("Reset Session (Clear All Data)", key="reset_session_btn", type="secondary"):
             for key in list(st.session_state.keys()):
                 del st.session_state[key]
             st.rerun()
+
+    # If already confirmed, show summary and option to re-edit
+    if st.session_state.get("df_ready") and st.session_state.get("constructs"):
+        saved_constructs = st.session_state["constructs"]
+        saved_paths      = st.session_state.get("structural_paths", [])
+        st.success("✅ Model already configured. Showing current setup:")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("**Constructs:**")
+            for cname, items in saved_constructs.items():
+                st.markdown(f"- **{cname}**: {', '.join(items)}")
+        with col2:
+            st.markdown("**Structural Paths:**")
+            for i, (pred, out) in enumerate(saved_paths, 1):
+                st.markdown(f"- H{i}: {pred} → {out}")
+        if not st.checkbox("Re-configure model setup", key="reconfig_checkbox"):
+            return
     with st.expander("Data Preview", expanded=True):
         st.dataframe(df.head(10), use_container_width=True)
         st.caption(f"Shape: {df.shape[0]:,} rows x {df.shape[1]} columns")
@@ -359,14 +376,18 @@ def render_data_input():
 
     if constructs:
         if st.button("Confirm Model Setup and Proceed", type="primary", use_container_width=True, key="confirm_setup_btn"):
-            st.session_state["df"]       = df
-            st.session_state["df_ready"] = True
+            st.session_state["df"]         = df
+            st.session_state["df_ready"]   = True
             st.session_state["validation"] = validation
+            st.session_state["constructs"] = constructs
+            st.session_state["structural_paths"] = paths
             cfa_lines = [f"{c} =~ {' + '.join(items)}" for c, items in constructs.items() if items]
             st.session_state["cfa_syntax"] = "\n".join(cfa_lines)
             sem_lines = cfa_lines.copy()
-            for pred, out in st.session_state.get("structural_paths", []):
+            for pred, out in paths:
                 sem_lines.append(f"{out} ~ {pred}")
             st.session_state["sem_syntax"] = "\n".join(sem_lines)
+            # Save assignments too
+            st.session_state["assignments"] = assignments
             st.balloons()
             badge("excellent", "Model setup complete! Navigate to Descriptive Statistics in the sidebar to continue.")
