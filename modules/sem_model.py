@@ -121,7 +121,34 @@ def render_sem_estimation(syntax, df, constructs):
                 )
 
             if "error" in result:
-                st.error(f"SEM estimation failed: {result['error']}")
+                err_msg = result['error']
+                # Translate technical lavaan errors to user-friendly messages
+                if "did not converge" in err_msg or "fit measures not available" in err_msg:
+                    st.error(
+                        "SEM could not be estimated because the model did not converge. "
+                        "This usually means the data does not fit the model structure. "
+                        "Common causes: (1) Poor measurement model — check CFA fit first; "
+                        "(2) Very low factor loadings or AVE; "
+                        "(3) Too many items relative to sample size. "
+                        "Please review your CFA results before running SEM."
+                    )
+                elif "missing observed variables" in err_msg:
+                    missing = err_msg.split(":")[-1].strip()
+                    st.error(
+                        f"Variable(s) not found in dataset: {missing}. "
+                        "Make sure construct names in Data Input match exactly — "
+                        "check for typos, extra spaces, or differences in capitalization."
+                    )
+                elif "singular" in err_msg.lower():
+                    st.error(
+                        "SEM failed due to a singular matrix — two or more items are perfectly correlated. "
+                        "Check your data for duplicate columns or items with identical values."
+                    )
+                else:
+                    st.error(
+                        f"SEM estimation failed. Technical details: {err_msg}. "
+                        "Try reviewing your CFA results and ensure the measurement model is valid."
+                    )
                 st.markdown("Troubleshooting:")
                 st.markdown("- Ensure all item names match your data columns exactly")
                 st.markdown("- Verify the measurement model (CFA) was validated first")
