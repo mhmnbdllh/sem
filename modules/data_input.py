@@ -239,19 +239,32 @@ def render_structural_paths(constructs):
     if len(construct_names) < 2:
         st.warning("You need at least 2 constructs to define structural paths.")
         return []
-    n_paths = st.number_input("How many structural paths (hypotheses)?", min_value=1, max_value=30, value=1, step=1, key="n_paths_input")
-    paths = []
+
+    # Restore saved paths
+    saved_paths = st.session_state.get("structural_paths", [])
+    saved_n     = len(saved_paths) if saved_paths else 1
+
+    n_paths = st.number_input("How many structural paths (hypotheses)?", min_value=1, max_value=30, value=saved_n, step=1, key="n_paths_input")
+    paths   = []
     for i in range(int(n_paths)):
         c1, c2, c3 = st.columns([2, 1, 2])
+
+        # Restore saved pred/out for this path
+        saved_pred = saved_paths[i][0] if i < len(saved_paths) else construct_names[0]
+        saved_out  = saved_paths[i][1] if i < len(saved_paths) else (construct_names[1] if len(construct_names) > 1 else construct_names[0])
+
+        pred_idx = construct_names.index(saved_pred) if saved_pred in construct_names else 0
+
         with c1:
-            pred = st.selectbox(f"Predictor (H{i+1})", construct_names, key=f"pred_{i}")
+            pred = st.selectbox(f"Predictor (H{i+1})", construct_names, index=pred_idx, key=f"pred_{i}")
         with c2:
             st.markdown("<br><div style='text-align:center;font-size:1.4rem'>to</div>", unsafe_allow_html=True)
         with c3:
             out_opts = [c for c in construct_names if c != pred]
             if not out_opts:
                 continue
-            out = st.selectbox(f"Outcome (H{i+1})", out_opts, key=f"out_{i}")
+            out_idx = out_opts.index(saved_out) if saved_out in out_opts else 0
+            out = st.selectbox(f"Outcome (H{i+1})", out_opts, index=out_idx, key=f"out_{i}")
         if pred and out:
             paths.append((pred, out))
     return paths
