@@ -571,6 +571,18 @@ def render_sem():
             "CFA has not been validated yet. "
             "Complete Confirmatory Factor Analysis before running SEM."
         )
+    else:
+        # Check CFA fit quality
+        cfa_fit = st.session_state.get("cfa_fit", {})
+        cfi = float(cfa_fit.get("cfi") or 0)
+        rmsea = float(cfa_fit.get("rmsea") or 1)
+        if cfi < 0.90 or rmsea > 0.08:
+            badge("critical",
+                f"CFA fit is inadequate (CFI={cfi:.3f}, RMSEA={rmsea:.3f}). "
+                "SEM results will not be interpretable. "
+                "Strongly recommended: fix measurement model before proceeding. "
+                "Common causes: low factor loadings, too many items, cross-loadings."
+            )
 
     df               = st.session_state["df"]
     constructs       = st.session_state.get("constructs", {})
