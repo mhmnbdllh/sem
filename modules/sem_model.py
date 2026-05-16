@@ -576,6 +576,19 @@ def render_sem():
     constructs       = st.session_state.get("constructs", {})
     structural_paths = st.session_state.get("structural_paths", [])
 
+    # Restore from JSON if constructs lost
+    if not constructs and st.session_state.get("_model_config_json"):
+        import json
+        try:
+            cfg = json.loads(st.session_state["_model_config_json"])
+            constructs       = cfg.get("constructs", {})
+            structural_paths = [tuple(p) for p in cfg.get("structural_paths", [])]
+            st.session_state["constructs"]       = constructs
+            st.session_state["structural_paths"] = structural_paths
+            st.session_state["cfa_syntax"]       = cfg.get("cfa_syntax", "")
+            st.session_state["sem_syntax"]       = cfg.get("sem_syntax", "")
+        except: pass
+
     if not constructs:
         st.error("No constructs defined. Return to Data Input.")
         return
