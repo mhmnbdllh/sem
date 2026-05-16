@@ -100,7 +100,16 @@ def render_estimation(syntax, df, constructs):
                 )
 
             if "error" in result:
-                st.error(f"CFA estimation failed: {result['error']}")
+                err_msg = result['error']
+                if "did not converge" in err_msg or "fit measures not available" in err_msg:
+                    st.error("Model did not converge. This usually means poor data quality — check factor loadings and AVE in CFA first.")
+                elif "missing observed variables" in err_msg:
+                    missing = err_msg.split(":")[-1].strip()
+                    st.error(f"Variable(s) not found: {missing}. Check construct names in Data Input for typos or capitalization differences.")
+                elif "singular" in err_msg.lower():
+                    st.error("Failed due to a singular matrix — two or more items may be perfectly correlated or have zero variance.")
+                else:
+                    st.error(f"CFA estimation failed. Please check your data and model specification. Details: {err_msg}")
                 st.markdown("Common fixes:")
                 st.markdown("- Ensure item names in syntax match column names exactly")
                 st.markdown("- Check for missing values")
