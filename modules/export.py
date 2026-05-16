@@ -811,9 +811,9 @@ def generate_html_report():
         ]
         s12 = _html_tbl(["Term","β","SE","p","Sig.","Interpretation"], mod_coef_rows,
             f"Moderation Analysis: {x} × {w} → {y}",
-            "Note: β = standardized coefficient. SE = Standard Error. "
-            "Sig.: * p &lt; .05 (significant); ** p &lt; .01 (highly significant); *** p &lt; .001 (very highly significant). "
-            "Variables are mean-centered before computing the interaction term (Aiken &amp; West, 1991).")
+            "Note: β = standardized regression coefficient. SE = Standard Error. p = p-value. "
+            "Sig.: * p &lt; .05; ** p &lt; .01; *** p &lt; .001 — stars indicate level of statistical significance. "
+            "Variables mean-centered before interaction (Aiken &amp; West, 1991).")
         s12 += _html_tbl(
             ["Model","R²","ΔR²"],
             [[f"Model 1: {x} + {w}", _fmt(r2_1), "—"],
@@ -837,7 +837,9 @@ def generate_html_report():
                 ["W Level","Simple Slope","SE","t","p","Sig.","Interpretation"],
                 ss_rows,
                 "Simple Slope Analysis",
-                "Note: Simple slopes show X → Y effect at low (−1 SD), mean, and high (+1 SD) of W."
+                "Note: Simple slopes show the X → Y effect at different levels of W (moderator). "
+                "* p &lt; .05; ** p &lt; .01; *** p &lt; .001. "
+                "Low = −1 SD; Mean = mean of W; High = +1 SD."
             )
         sections.append(_html_section(12, f"Moderation Analysis ({x} × {w} → {y})", s12))
 
