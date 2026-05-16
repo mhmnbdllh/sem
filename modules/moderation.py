@@ -247,12 +247,16 @@ def render_moderation_results(df, constructs, x_var, w_var, y_var, low_sd, high_
             se    = _safe_float(slope_data.get("se"))
             t_val = _safe_float(slope_data.get("t"))
             p_val = _safe_float(slope_data.get("p"))
+            ci_lo = _safe_float(slope_data.get("ci_lo"))
+            ci_hi = _safe_float(slope_data.get("ci_hi"))
+            ci_str = f"[{ci_lo:.4f}, {ci_hi:.4f}]" if ci_lo is not None and ci_hi is not None else "—"
             slope_rows.append({
                 "W Level":          label,
-                "Simple Slope (b)": round(slope, 4) if slope else "—",
-                "SE":               round(se, 4)    if se    else "—",
+                "Simple Slope (b)": round(slope, 4) if slope is not None else "—",
+                "SE":               round(se, 4)    if se    is not None else "—",
                 "t":                round(t_val, 3) if t_val is not None else "—",
                 "p":                round(p_val, 4) if p_val is not None else "—",
+                "95% CI":           ci_str,
                 "Sig.":             "Yes" if p_val is not None and p_val < 0.05 else "No",
             })
 
@@ -345,6 +349,88 @@ def render_moderation_results(df, constructs, x_var, w_var, y_var, low_sd, high_
                     f"The interaction plot shows the effect of **{x_var}** on **{y_var}** "
                     f"**weakens as {w_var} increases** — a **buffering moderation** pattern."
                 )
+
+    # ── Effect size f² for interaction ───────────────────────────────
+    f2_int = _safe_float(result.get("f2_interaction"))
+    if f2_int is not None:
+        f2_label = "Large (≥ .35)" if f2_int >= 0.35 else "Medium (≥ .15)" if f2_int >= 0.15 else "Small (≥ .02)" if f2_int >= 0.02 else "Negligible (< .02)"
+        badge("ok", f"Effect size for interaction: f² = {f2_int:.4f} — {f2_label} (Cohen, 1988).")
+
+    # ── Johnson-Neyman Technique ──────────────────────────────────────
+    jn = result.get("jn_boundaries")
+    if jn and isinstance(jn, dict):
+        jn_lo = _safe_float(jn.get("lower"))
+        jn_hi = _safe_float(jn.get("upper"))
+        if jn_lo is not None and jn_hi is not None:
+            st.markdown("---")
+            st.markdown("**Johnson-Neyman Technique (Region of Significance):**")
+            st.markdown(
+                "Identifies the exact moderator (W) values where the X → Y effect "
+                "transitions from significant to non-significant — more precise than ±1 SD."
+            )
+            badge("ok",
+                f"The effect of **{x_var}** on **{y_var}** is significant (p < .05) "
+                f"when **{w_var}** is outside [{jn_lo:.4f}, {jn_hi:.4f}] (mean-centered). "
+                "Within this range the effect is not significant."
+            )
+
+    # ── Floodlight Analysis ───────────────────────────────────────────
+    fl = result.get("floodlight")
+    if fl and isinstance(fl, dict) and fl.get("w_values"):
+        st.markdown("---")
+        st.markdown("**Floodlight Analysis:**")
+        st.markdown(
+            "Visualizes the simple slope of X → Y across the full range of W. "
+            "Green = significant (p < .05); Red = not significant. "
+            "Dashed lines = Johnson-Neyman boundaries."
+        )
+        try:
+            w_vals  = [float(v) for v in fl["w_values"]]
+            slps    = [float(v) for v in fl["slopes"]]
+            ci_los  = [float(v) for v in fl["ci_lo"]]
+            ci_his  = [float(v) for v in fl["ci_hi"]]
+            sig_fl  = [bool(v)  for v in fl["sig"]]
+
+            fig_fl = go.Figure()
+            fig_fl.add_trace(go.Scatter(
+                x=w_vals + w_vals[::-1],
+                y=ci_his + ci_los[::-1],
+                fill="toself", fillcolor="rgba(46,134,171,0.12)",
+                line=dict(color="rgba(0,0,0,0)"), name="95% CI", hoverinfo="skip",
+            ))
+            for i in range(len(w_vals)-1):
+                col = "#1a7a4a" if sig_fl[i] else "#e74c3c"
+                fig_fl.add_trace(go.Scatter(
+                    x=[w_vals[i], w_vals[i+1]], y=[slps[i], slps[i+1]],
+                    mode="lines", line=dict(color=col, width=2.5), showlegend=False,
+                    hovertemplate=f"W={w_vals[i]:.3f}<br>Slope={slps[i]:.4f}<extra></extra>",
+                ))
+            fig_fl.add_hline(y=0, line_dash="dash", line_color="#888", line_width=1)
+            if jn and isinstance(jn, dict):
+                for bval in [_safe_float(jn.get("lower")), _safe_float(jn.get("upper"))]:
+                    if bval is not None:
+                        fig_fl.add_vline(x=bval, line_dash="dot", line_color="#b7770d",
+                            line_width=2, annotation_text=f"JN={bval:.3f}", annotation_position="top")
+            fig_fl.add_trace(go.Scatter(x=[None], y=[None], mode="lines",
+                line=dict(color="#1a7a4a", width=2.5), name="Sig. (p < .05)"))
+            fig_fl.add_trace(go.Scatter(x=[None], y=[None], mode="lines",
+                line=dict(color="#e74c3c", width=2.5), name="Non-sig."))
+            fig_fl.update_layout(
+                template="simple_white", height=380,
+                title=f"Floodlight: {x_var} → {y_var} across {w_var}",
+                xaxis_title=f"{w_var} (mean-centered)",
+                yaxis_title=f"Simple slope ({x_var} → {y_var})",
+                margin=dict(t=60, b=80, l=60, r=40),
+                font_color="#1a1a1a", plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
+                legend=dict(orientation="h", y=-0.25, x=0),
+            )
+            st.plotly_chart(fig_fl, use_container_width=True)
+            st.caption("Green = significant effect (p < .05); Red = non-significant. Dashed lines = JN boundaries. Shaded area = 95% CI.")
+        except Exception as e:
+            st.warning(f"Floodlight plot unavailable: {str(e)}")
+
+    # ── Update simple slopes table with CI ───────────────────────────
+    # (CI already shown in slope_rows above via ci_str)
 
 
 def render_moderation():
