@@ -436,11 +436,30 @@ def render_moderation_results(df, constructs, x_var, w_var, y_var, low_sd, high_
 def render_moderation():
     st.title("Moderation Analysis")
     st.markdown(
-        "Moderation tests whether a **third variable (W)** changes the strength "
-        "or direction of the relationship between **X** and **Y**.\n\n"
-        "> Variables are **mean-centered** before creating the interaction term "
-        "to reduce multicollinearity (Aiken & West, 1991)."
+        "Moderation tests whether a **third variable (W, the moderator)** changes "
+        "the strength or direction of the relationship between **X** and **Y**."
     )
+    with st.expander("📖 How Moderation Works", expanded=False):
+        st.markdown("""
+**Moderation** (also called interaction) asks: *Does the effect of X on Y depend on the level of W?*
+
+```
+        W (Moderator)
+        |
+X ──────┤──────► Y
+   interaction
+```
+
+- **W** = the variable that changes the X→Y relationship (e.g., gender, motivation level)
+- **Significant interaction** (X×W): the effect of X on Y is different at different levels of W
+- **Non-significant interaction**: W does not moderate the X→Y relationship
+
+**Simple slopes** show the X→Y effect at Low (−1 SD), Mean, and High (+1 SD) of W.
+
+**Johnson-Neyman** technique identifies the exact W values where the effect transitions from significant to non-significant.
+
+> Variables are **mean-centered** before computing the interaction term to reduce multicollinearity (Aiken & West, 1991).
+        """)
 
     if not st.session_state.get("df_ready"):
         st.warning("Please complete Data Input and Model Setup first.")
