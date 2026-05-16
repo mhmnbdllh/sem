@@ -1091,8 +1091,8 @@ def generate_html_report():
 </head>
 <body>
 <h1>SEM Studio Analysis Report</h1>
-<p style="color:#888;font-size:0.82rem;margin-top:4px">
-  Generated: {now} &nbsp;|&nbsp; Powered by R/lavaan (Rosseel, 2012) &nbsp;|&nbsp; n = {n}
+<p style="color:#000;font-size:0.95rem;margin-top:4px">
+  Generated: {now} &nbsp;|&nbsp; Scripted by Dr. Muhaimin Abdullah, S.Pd., M.Pd. Powered by R/lavaan (Rosseel, 2012) &nbsp;|&nbsp; n = {n}
 </p>
 <hr style="border:none;border-top:1px solid #dde3ea;margin:16px 0">
 {toc_html}
