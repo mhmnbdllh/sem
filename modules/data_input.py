@@ -293,6 +293,18 @@ def render_data_input():
     st.title("Data Input and Model Setup")
     st.markdown("Upload your dataset and define your measurement and structural model.")
     st.markdown("---")
+
+    # Restore model config from persistent storage if session state lost
+    import json
+    if not st.session_state.get("constructs") and st.session_state.get("_model_config_json"):
+        try:
+            cfg = json.loads(st.session_state["_model_config_json"])
+            st.session_state["constructs"]       = cfg.get("constructs", {})
+            st.session_state["structural_paths"] = [tuple(p) for p in cfg.get("structural_paths", [])]
+            st.session_state["cfa_syntax"]       = cfg.get("cfa_syntax", "")
+            st.session_state["sem_syntax"]       = cfg.get("sem_syntax", "")
+        except: pass
+
     df = render_data_upload()
     if df is None:
         return
@@ -381,13 +393,21 @@ def render_data_input():
             st.session_state["validation"] = validation
             st.session_state["constructs"] = constructs
             st.session_state["structural_paths"] = paths
+            st.session_state["assignments"] = assignments
             cfa_lines = [f"{c} =~ {' + '.join(items)}" for c, items in constructs.items() if items]
             st.session_state["cfa_syntax"] = "\n".join(cfa_lines)
             sem_lines = cfa_lines.copy()
             for pred, out in paths:
                 sem_lines.append(f"{out} ~ {pred}")
             st.session_state["sem_syntax"] = "\n".join(sem_lines)
-            # Save assignments too
-            st.session_state["assignments"] = assignments
+            # Persist model config to storage so it survives Streamlit restarts
+            import json
+            model_config = {
+                "constructs": {k: list(v) for k,v in constructs.items()},
+                "structural_paths": [list(p) for p in paths],
+                "cfa_syntax": st.session_state["cfa_syntax"],
+                "sem_syntax": st.session_state["sem_syntax"],
+            }
+            st.session_state["_model_config_json"] = json.dumps(model_config)
             st.balloons()
             badge("excellent", "Model setup complete! Navigate to Descriptive Statistics in the sidebar to continue.")
