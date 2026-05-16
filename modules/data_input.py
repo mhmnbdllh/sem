@@ -226,7 +226,9 @@ def render_structural_paths(constructs):
             paths.append((pred, out))
     return paths
 
-def render_advanced_options(constructs):
+def render_advanced_options(constructs, existing_paths=None):
+    if existing_paths is None:
+        existing_paths = []
     options = {}
     construct_names = list(constructs.keys())
     with st.expander("Optional: Mediation and Moderation Setup"):
