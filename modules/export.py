@@ -195,7 +195,6 @@ def generate_apa_narrative():
         f"The analysis was conducted on a sample of N = {n} participants. "
         f"{est} estimation was used based on Mardia multivariate normality assessment. "
         f"All analyses were performed using SEM Studio (R/lavaan; Rosseel, 2012)."
-        f"Scripted by Dr. Muhaimin Abdullah, S.Pd., M.Pd. (https://muhaiminabdullah.com)"
     )
     lines.append("")
     lines.append("MEASUREMENT MODEL (CFA)")
@@ -1145,34 +1144,109 @@ def render_html_export():
 
 def render_text_export():
     st.subheader("Quick Text Summary")
-    ss    = st.session_state
+    st.markdown("All key statistics in one place — copy and paste into your notes.")
+    ss = st.session_state
     lines = []
-    cfa_fit  = ss.get("cfa_fit", {})
+
+    # CFA Fit
+    cfa_fit = ss.get("cfa_fit", {})
     if cfa_fit:
-        lines.append("CFA FIT:")
-        for k in ["rmsea","cfi","tli","srmr","aic","bic"]:
+        chi2 = _safe_float(cfa_fit.get("chi2"))
+        df_  = _safe_float(cfa_fit.get("df"))
+        p_   = _safe_float(cfa_fit.get("pvalue"))
+        lines.append("CFA FIT INDICES:")
+        if chi2 and df_: lines.append(f"  chi2({int(df_)}) = {chi2:.3f}, p = {_fmt(p_,3)}")
+        if chi2 and df_ and df_ > 0: lines.append(f"  chi2/df = {chi2/df_:.3f}")
+        for k,label in [("rmsea","RMSEA"),("cfi","CFI"),("tli","TLI"),("srmr","SRMR"),("gfi","GFI"),("nfi","NFI"),("aic","AIC"),("bic","BIC")]:
             v = _safe_float(cfa_fit.get(k))
-            if v is not None: lines.append(f"  {k.upper()} = {v:.3f}")
+            if v is not None: lines.append(f"  {label} = {v:.3f}")
+
+    # SEM Fit
+    sem_fit = ss.get("sem_fit", {})
+    if sem_fit:
+        chi2 = _safe_float(sem_fit.get("chi2"))
+        df_  = _safe_float(sem_fit.get("df"))
+        p_   = _safe_float(sem_fit.get("pvalue"))
+        lines.append("\nSEM FIT INDICES:")
+        if chi2 and df_: lines.append(f"  chi2({int(df_)}) = {chi2:.3f}, p = {_fmt(p_,3)}")
+        if chi2 and df_ and df_ > 0: lines.append(f"  chi2/df = {chi2/df_:.3f}")
+        for k,label in [("rmsea","RMSEA"),("cfi","CFI"),("tli","TLI"),("srmr","SRMR"),("aic","AIC"),("bic","BIC")]:
+            v = _safe_float(sem_fit.get(k))
+            if v is not None: lines.append(f"  {label} = {v:.3f}")
+
+    # Reliability
+    metrics = ss.get("cfa_metrics", {})
+    if metrics:
+        lines.append("\nRELIABILITY AND VALIDITY:")
+        for cname, m in metrics.items():
+            alpha = _safe_float(m.get("alpha"))
+            cr    = _safe_float(m.get("cr"))
+            ave   = _safe_float(m.get("ave"))
+            lines.append(f"  {cname}: alpha={_fmt(alpha)}, CR={_fmt(cr)}, AVE={_fmt(ave)}")
+
+    # Structural Paths
     sem_paths = ss.get("sem_paths", [])
     if sem_paths:
         lines.append("\nSTRUCTURAL PATHS:")
         for i, p in enumerate(sem_paths):
             beta  = _safe_float(p.get("beta"))
+            se    = _safe_float(p.get("se"))
+            z     = _safe_float(p.get("z"))
             p_val = _safe_float(p.get("p"))
             if beta is not None:
-                lines.append(f"  H{i+1}: {p.get('predictor','?')} -> {p.get('outcome','?')}: beta = {beta:.3f}, p = {_fmt(p_val,3)}")
+                lines.append(
+                    f"  H{i+1}: {p.get('predictor','?')} -> {p.get('outcome','?')}: "
+                    f"beta={beta:.3f}{_stars(p_val)}, SE={_fmt(se)}, z={_fmt(z)}, p={_fmt(p_val,4)}"
+                )
+
+    # R2
+    sem_r2 = ss.get("sem_r2", [])
+    if sem_r2:
+        lines.append("\nEXPLAINED VARIANCE (R2):")
+        for row in sem_r2:
+            if isinstance(row, dict):
+                r2 = _safe_float(row.get("R2"))
+                if r2 is not None:
+                    lines.append(f"  {row.get('Construct','?')}: R2 = {r2:.3f} ({r2:.1%})")
+
+    # Mediation
     med = ss.get("mediation_results", {})
+    med_vars = ss.get("mediation_vars", {})
     if med and isinstance(med, dict):
-        indirect_data = med.get("indirect", {})
-        if isinstance(indirect_data, dict):
-            indirect = _safe_float(indirect_data.get("est"))
-            ci_lo    = _safe_float(indirect_data.get("ci_lo"))
-            ci_hi    = _safe_float(indirect_data.get("ci_hi"))
-            if indirect is not None:
-                lines.append(f"\nMEDIATION:")
-                lines.append(f"  Indirect = {indirect:.4f}, 95% CI [{_fmt(ci_lo,4)}, {_fmt(ci_hi,4)}]")
+        x = med_vars.get("x","X"); m_v = med_vars.get("m","M"); y = med_vars.get("y","Y")
+        lines.append(f"\nMEDIATION ({x} -> {m_v} -> {y}):")
+        for key, label in [("a_path","a path"),("b_path","b path"),("cp_path","c' direct"),("total","c total"),("indirect","Indirect")]:
+            d = med.get(key, {})
+            if isinstance(d, dict):
+                est   = _safe_float(d.get("est"))
+                ci_lo = _safe_float(d.get("ci_lo"))
+                ci_hi = _safe_float(d.get("ci_hi"))
+                p_val = _safe_float(d.get("p"))
+                if est is not None:
+                    ci_str = f", 95% CI [{_fmt(ci_lo,4)}, {_fmt(ci_hi,4)}]" if ci_lo is not None else ""
+                    p_str  = f", p={_fmt(p_val,4)}" if p_val is not None else ""
+                    lines.append(f"  {label}: beta={est:.4f}{_stars(p_val)}{ci_str}{p_str}")
+        med_type = ss.get("mediation_type", "")
+        vaf      = ss.get("mediation_vaf")
+        if med_type: lines.append(f"  Type: {med_type}")
+        if vaf:      lines.append(f"  VAF = {vaf:.1%}")
+
+    # Moderation
+    mod = ss.get("moderation_results", {})
+    mod_vars = ss.get("moderation_vars", {})
+    if mod and isinstance(mod, dict):
+        x = mod_vars.get("x","X"); w = mod_vars.get("w","W"); y = mod_vars.get("y","Y")
+        b3   = _safe_float(mod.get("b3"))
+        b3_p = _safe_float(mod.get("b3_p"))
+        dr2  = _safe_float(mod.get("delta_r2"))
+        f2   = _safe_float(mod.get("f2_interaction"))
+        lines.append(f"\nMODERATION ({x} x {w} -> {y}):")
+        if b3   is not None: lines.append(f"  Interaction beta = {b3:.4f}{_stars(b3_p)}, p = {_fmt(b3_p,4)}")
+        if dr2  is not None: lines.append(f"  Delta R2 = {dr2:.4f}")
+        if f2   is not None: lines.append(f"  f2 (interaction) = {f2:.4f}")
+
     text = "\n".join(lines) if lines else "No results yet. Run analyses first."
-    st.text_area("Results Summary", value=text, height=250, key="text_export_area")
+    st.text_area("Results Summary", value=text, height=400, key="text_export_area")
 
 
 def render_export():
