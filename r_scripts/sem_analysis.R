@@ -443,46 +443,101 @@ run_moderation <- function(data, x_var, w_var, y_var, constructs) {
 
     coefs <- coef(s2)
 
-    # Simple slopes at -1 SD, mean, +1 SD of W
-    w_sd   <- sd(data[[w_var]], na.rm = TRUE)
-    slopes <- list()
+    # ── Simple slopes at -1 SD, mean, +1 SD of W ──────────────────
+    w_sd      <- sd(data[[w_var]], na.rm = TRUE)
+    cov_mat   <- vcov(m2)
+    df_res    <- nrow(data) - 4
+    slopes    <- list()
+
     for (level in c(-1, 0, 1)) {
       w_val  <- level * w_sd
       slope  <- coefs["x", "Estimate"] + coefs["xw", "Estimate"] * w_val
       se_val <- sqrt(
-        coefs["x", "Std. Error"]^2 +
-        (w_val^2) * coefs["xw", "Std. Error"]^2
+        cov_mat["x",  "x"]  +
+        2 * w_val * cov_mat["x",  "xw"] +
+        w_val^2   * cov_mat["xw", "xw"]
       )
       t_val  <- slope / se_val
-      p_val  <- 2 * pt(abs(t_val), df = nrow(data) - 4, lower.tail = FALSE)
+      p_val  <- 2 * pt(abs(t_val), df = df_res, lower.tail = FALSE)
       label  <- if (level == -1) "Low (-1 SD)" else if (level == 0) "Mean" else "High (+1 SD)"
       slopes[[label]] <- list(
-        slope = round(slope, 4),
-        se    = round(se_val, 4),
-        t     = round(t_val, 4),
-        p     = round(p_val, 4)
+        slope  = round(slope,  4),
+        se     = round(se_val, 4),
+        t      = round(t_val,  4),
+        p      = round(p_val,  4),
+        ci_lo  = round(slope - qt(0.975, df_res) * se_val, 4),
+        ci_hi  = round(slope + qt(0.975, df_res) * se_val, 4)
       )
     }
 
+    # ── Johnson-Neyman technique ────────────────────────────────────
+    b1_est   <- coefs["x",  "Estimate"]
+    b3_est   <- coefs["xw", "Estimate"]
+    var_b1   <- cov_mat["x",  "x"]
+    var_b3   <- cov_mat["xw", "xw"]
+    cov_b1b3 <- cov_mat["x",  "xw"]
+    t_crit   <- qt(0.975, df = df_res)
+
+    a_q <- b3_est^2 - t_crit^2 * var_b3
+    b_q <- 2 * (b1_est * b3_est - t_crit^2 * cov_b1b3)
+    c_q <- b1_est^2  - t_crit^2 * var_b1
+    disc <- b_q^2 - 4 * a_q * c_q
+
+    jn_boundaries <- NULL
+    if (!is.na(disc) && disc >= 0 && abs(a_q) > 1e-10) {
+      jn1 <- (-b_q - sqrt(disc)) / (2 * a_q)
+      jn2 <- (-b_q + sqrt(disc)) / (2 * a_q)
+      jn_boundaries <- list(
+        lower = round(min(jn1, jn2), 4),
+        upper = round(max(jn1, jn2), 4)
+      )
+    }
+
+    # ── Floodlight analysis (50 points across W range) ──────────────
+    w_min   <- min(w)
+    w_max   <- max(w)
+    w_seq   <- seq(w_min, w_max, length.out = 50)
+    fl_slopes <- b1_est + b3_est * w_seq
+    fl_se     <- sqrt(var_b1 + 2 * w_seq * cov_b1b3 + w_seq^2 * var_b3)
+    fl_t      <- fl_slopes / fl_se
+    fl_p      <- 2 * pt(abs(fl_t), df = df_res, lower.tail = FALSE)
+    fl_ci_lo  <- fl_slopes - t_crit * fl_se
+    fl_ci_hi  <- fl_slopes + t_crit * fl_se
+
+    floodlight <- list(
+      w_values  = as.list(round(w_seq + mean(data[[w_var]], na.rm=TRUE), 4)),
+      slopes    = as.list(round(fl_slopes, 4)),
+      ci_lo     = as.list(round(fl_ci_lo,  4)),
+      ci_hi     = as.list(round(fl_ci_hi,  4)),
+      p_values  = as.list(round(fl_p,      4)),
+      sig       = as.list(fl_p < 0.05)
+    )
+
+    # ── Effect size f2 for interaction term ─────────────────────────
+    f2_interaction <- delta_r2 / (1 - r2_2)
+
     return(list(
-      b0          = round(coefs["(Intercept)", "Estimate"], 4),
-      b1          = round(coefs["x", "Estimate"], 4),
-      b1_se       = round(coefs["x", "Std. Error"], 4),
-      b1_t        = round(coefs["x", "t value"], 4),
-      b1_p        = round(coefs["x", "Pr(>|t|)"], 4),
-      b2          = round(coefs["w", "Estimate"], 4),
-      b2_se       = round(coefs["w", "Std. Error"], 4),
-      b2_t        = round(coefs["w", "t value"], 4),
-      b2_p        = round(coefs["w", "Pr(>|t|)"], 4),
-      b3          = round(coefs["xw", "Estimate"], 4),
-      b3_se       = round(coefs["xw", "Std. Error"], 4),
-      b3_t        = round(coefs["xw", "t value"], 4),
-      b3_p        = round(coefs["xw", "Pr(>|t|)"], 4),
-      r2_1        = round(r2_1, 4),
-      r2_2        = round(r2_2, 4),
-      delta_r2    = round(delta_r2, 4),
+      b0            = round(coefs["(Intercept)", "Estimate"], 4),
+      b1            = round(coefs["x",  "Estimate"], 4),
+      b1_se         = round(coefs["x",  "Std. Error"], 4),
+      b1_t          = round(coefs["x",  "t value"], 4),
+      b1_p          = round(coefs["x",  "Pr(>|t|)"], 4),
+      b2            = round(coefs["w",  "Estimate"], 4),
+      b2_se         = round(coefs["w",  "Std. Error"], 4),
+      b2_t          = round(coefs["w",  "t value"], 4),
+      b2_p          = round(coefs["w",  "Pr(>|t|)"], 4),
+      b3            = round(coefs["xw", "Estimate"], 4),
+      b3_se         = round(coefs["xw", "Std. Error"], 4),
+      b3_t          = round(coefs["xw", "t value"], 4),
+      b3_p          = round(coefs["xw", "Pr(>|t|)"], 4),
+      r2_1          = round(r2_1,          4),
+      r2_2          = round(r2_2,          4),
+      delta_r2      = round(delta_r2,      4),
+      f2_interaction= round(f2_interaction, 4),
       simple_slopes = slopes,
-      n           = nrow(data)
+      jn_boundaries = jn_boundaries,
+      floodlight    = floodlight,
+      n             = nrow(data)
     ))
 
   }, error = function(e) {
