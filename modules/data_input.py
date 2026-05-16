@@ -278,6 +278,7 @@ def render_data_input():
     constructs = render_construct_definition(df, assignments)
     st.session_state["constructs"] = constructs
     st.markdown("---")
+    paths = []
     if constructs:
         paths = render_structural_paths(constructs)
         st.session_state["structural_paths"] = paths
