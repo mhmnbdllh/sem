@@ -228,22 +228,30 @@ run_cfa <- function(data, model_syntax, estimator = "MLR") {
       lavaan::modindices(fit, sort. = TRUE, maximum.number = 10)
     }, error = function(e) NULL)
 
-    # Convert AVE to named list
-    ave_named <- if (!is.null(ave)) {
-      as.list(setNames(as.numeric(ave), names(ave)))
-    } else NULL
-
     # Convert reliability to named list per construct
+    # Validate: CR and alpha must be between 0 and 1 (negative eigenvalues can cause absurd values)
+    safe_rel <- function(x) {
+      v <- tryCatch(as.numeric(x), error=function(e) NA)
+      if (is.na(v) || !is.finite(v) || v < 0 || v > 1) NA else v
+    }
     rel_named <- if (!is.null(rel) && (is.matrix(rel) || is.data.frame(rel))) {
       rel_list <- list()
       for (cn in colnames(rel)) {
         rel_list[[cn]] <- list(
-          alpha = tryCatch(as.numeric(rel["alpha", cn]), error=function(e) NA),
-          omega = tryCatch(as.numeric(rel["omega2", cn]), error=function(e) NA),
-          cr    = tryCatch(as.numeric(rel["omega3", cn]), error=function(e) NA)
+          alpha = safe_rel(rel["alpha", cn]),
+          omega = safe_rel(rel["omega2", cn]),
+          cr    = safe_rel(rel["omega3", cn])
         )
       }
       rel_list
+    } else NULL
+
+    # Validate AVE: must be between 0 and 1
+    ave_named <- if (!is.null(ave)) {
+      valid_ave <- sapply(as.numeric(ave), function(v) {
+        if (is.na(v) || !is.finite(v) || v < 0 || v > 1) NA else v
+      })
+      as.list(setNames(valid_ave, names(ave)))
     } else NULL
 
     return(list(
