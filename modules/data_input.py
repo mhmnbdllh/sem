@@ -163,6 +163,10 @@ def render_variable_assignment(df):
         st.markdown("**Numeric Columns**")
         for col in numeric_cols:
             default = 2 if any(h in col.lower() for h in id_hints) else 0
+            # Restore from session state if available
+            saved_role = st.session_state.get(f"role_{col}")
+            if saved_role is not None and saved_role in VARIABLE_ROLES:
+                default = list(VARIABLE_ROLES.keys()).index(saved_role)
             role = st.selectbox(
                 label=col,
                 options=list(VARIABLE_ROLES.keys()),
@@ -175,6 +179,9 @@ def render_variable_assignment(df):
         st.markdown("**Non-Numeric Columns**")
         for col in non_numeric_cols:
             default = 2 if any(h in col.lower() for h in id_hints) else 1
+            saved_role = st.session_state.get(f"role_{col}")
+            if saved_role is not None and saved_role in VARIABLE_ROLES:
+                default = list(VARIABLE_ROLES.keys()).index(saved_role)
             role = st.selectbox(
                 label=col,
                 options=list(VARIABLE_ROLES.keys()),
@@ -202,14 +209,19 @@ def render_construct_definition(df, assignments):
     if len(indicator_cols) < 3:
         st.error("Not enough indicator variables. Assign at least 3 columns as Indicator.")
         return {}
-    n_constructs = st.number_input("How many latent constructs?", min_value=1, max_value=20, value=2, step=1, key="n_constructs_input")
+    saved_n = len(st.session_state.get("constructs", {})) or 2
+    n_constructs = st.number_input("How many latent constructs?", min_value=1, max_value=20, value=saved_n, step=1, key="n_constructs_input")
     constructs = {}
     for i in range(int(n_constructs)):
         c1, c2 = st.columns([1, 3])
         with c1:
-            name = st.text_input(f"Construct {i+1} name", value=f"Construct{i+1}", key=f"construct_name_{i}")
+            saved_constructs = st.session_state.get("constructs", {})
+        saved_names = list(saved_constructs.keys())
+        default_name = saved_names[i] if i < len(saved_names) else f"Construct{i+1}"
+        name = st.text_input(f"Construct {i+1} name", value=default_name, key=f"construct_name_{i}")
         with c2:
-            selected = st.multiselect(f"Indicators for {name}", options=indicator_cols, key=f"construct_items_{i}")
+            saved_items = saved_constructs.get(name, saved_constructs.get(default_name, []))
+        selected = st.multiselect(f"Indicators for {name}", options=indicator_cols, default=[x for x in saved_items if x in indicator_cols], key=f"construct_items_{i}")
         if name and selected:
             constructs[name] = selected
             if len(selected) < 3:
