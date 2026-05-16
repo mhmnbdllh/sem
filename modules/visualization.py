@@ -27,40 +27,51 @@ def badge(level, message):
     )
 
 
-def compute_layout(constructs, structural_paths):
-    """Compute x,y positions for all nodes."""
+def compute_layout(constructs, structural_paths, show_indicators=True):
+    """
+    Compute x,y positions for all nodes.
+    Auto-scales spacing to prevent overlap with many items.
+    """
     construct_names = list(constructs.keys())
     endogenous  = set(out for _, out in structural_paths)
     exogenous   = set(construct_names) - endogenous
 
-    positions = {}
+    positions  = {}
+    ex_list    = sorted(list(exogenous))
+    en_list    = sorted(list(endogenous))
 
-    ex_list = sorted(list(exogenous))
-    en_list = sorted(list(endogenous))
+    # Auto-scale vertical spacing based on max items
+    max_items  = max((len(v) for v in constructs.values()), default=3) if show_indicators else 1
+    v_spacing  = max(3.0, max_items * 0.85)
 
     if not structural_paths:
         for i, name in enumerate(construct_names):
             angle = 2 * math.pi * i / max(len(construct_names), 1)
-            positions[name] = (3 * math.cos(angle), 3 * math.sin(angle))
+            positions[name] = (4 * math.cos(angle), 4 * math.sin(angle))
     else:
         for i, name in enumerate(ex_list):
-            y = (i - (len(ex_list) - 1) / 2) * 3.0
-            positions[name] = (-4.0, y)
+            y = (i - (len(ex_list) - 1) / 2) * v_spacing
+            positions[name] = (-5.0, y)
         for i, name in enumerate(en_list):
-            y = (i - (len(en_list) - 1) / 2) * 3.0
-            positions[name] = (4.0, y)
+            y = (i - (len(en_list) - 1) / 2) * v_spacing
+            positions[name] = (5.0, y)
 
-    # Indicators fan out from constructs
+    if not show_indicators:
+        return positions
+
+    # Indicator positions - auto-scale spacing
     for cname, items in constructs.items():
         if cname not in positions:
             positions[cname] = (0, 0)
-        cx, cy = positions[cname]
-        n_items = len(items)
+        cx, cy    = positions[cname]
+        n_items   = len(items)
         direction = -1 if cx <= 0 else 1
+        item_gap  = max(0.7, v_spacing / max(n_items, 1) * 0.9)
+        h_dist    = max(3.5, 2.5 + n_items * 0.08)
 
         for j, item in enumerate(items):
-            y_offset = (j - (n_items - 1) / 2) * 1.1
-            positions[item] = (cx + direction * 3.2, cy + y_offset)
+            y_offset = (j - (n_items - 1) / 2) * item_gap
+            positions[item] = (cx + direction * h_dist, cy + y_offset)
 
     return positions
 
@@ -70,7 +81,7 @@ def build_path_diagram(constructs, structural_paths,
                        r2_data=None, show_indicators=True):
     """Build interactive Plotly path diagram."""
 
-    positions = compute_layout(constructs, structural_paths)
+    positions = compute_layout(constructs, structural_paths, show_indicators)
 
     path_dict = {}
     if sem_paths:
@@ -251,9 +262,14 @@ def build_path_diagram(constructs, structural_paths,
     all_y = [v[1] for v in positions.values()]
     pad   = 1.5
 
+    # Auto-scale height: at least 35px per item, 80px per construct
+    max_items_count = max((len(v) for v in constructs.values()), default=3) if show_indicators else 1
+    n_constructs_count = len(constructs)
+    auto_height = max(600, max_items_count * 38 + n_constructs_count * 100)
+
     fig.update_layout(
         template="simple_white",
-        height=max(500, len([i for items in constructs.values() for i in items]) * 32 + 150),
+        height=auto_height,
         xaxis=dict(
             showgrid=False, zeroline=False, showticklabels=False,
             range=[min(all_x)-pad, max(all_x)+pad],
