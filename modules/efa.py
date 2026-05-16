@@ -359,7 +359,6 @@ def render_factor_naming_setup(n_factors_expected):
                     st.markdown(f"Items: {', '.join(items_list)}")
 
         factor_names[f] = name
-        st.session_state[f"efa_fname_{f}"] = name
 
     values = list(factor_names.values())
     if len(set(values)) < len(values):
@@ -422,7 +421,6 @@ def render_factor_naming(loadings_mat, n_factors):
             st.markdown(f"**Top items loading on {f}:** {top_str}")
 
         factor_names[f] = name
-        st.session_state[f"efa_fname_{f}"] = name
 
     values = list(factor_names.values())
     if len(set(values)) < len(values):
