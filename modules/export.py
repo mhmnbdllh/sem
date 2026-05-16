@@ -789,8 +789,8 @@ def generate_html_report():
         s11 = _html_tbl(["Effect","β","95% BCa CI","Significance"], med_rows_html,
             f"Bootstrap Mediation: {x} → {m_v} → {y}",
             f"Note: {med_results.get('n_boot',5000):,}-resample bootstrap via R/lavaan. "
-            "Significance criterion: 95% BCa CI not containing zero. "
-            "* p &lt; .05; ** p &lt; .01; *** p &lt; .001 for direct and total effects.")
+            "CI = Confidence Interval. Indirect effect is significant if CI does not contain zero. "
+            "* p &lt; .05; ** p &lt; .01; *** p &lt; .001 (for direct/total effects only).")
         s11 += _html_badge(med_level, f"<b>{med_type}</b>: indirect = {_fmt(ind,4)}, "
             f"95% BCa CI [{_fmt(cilo,4)}, {_fmt(cihi,4)}].{vaf_str}")
         sections.append(_html_section(11, f"Mediation Analysis ({x} → {m_v} → {y})", s11))
@@ -811,9 +811,9 @@ def generate_html_report():
         ]
         s12 = _html_tbl(["Term","β","SE","p","Sig.","Interpretation"], mod_coef_rows,
             f"Moderation Analysis: {x} × {w} → {y}",
-            "Note: * p &lt; .05; ** p &lt; .01; *** p &lt; .001. "
-            "Variables are mean-centered before computing the interaction term (Aiken & West, 1991). "
-            "A significant interaction term (X × W) indicates moderation.")
+            "Note: β = standardized coefficient. SE = Standard Error. "
+            "Sig.: * p &lt; .05 (significant); ** p &lt; .01 (highly significant); *** p &lt; .001 (very highly significant). "
+            "Variables are mean-centered before computing the interaction term (Aiken &amp; West, 1991).")
         s12 += _html_tbl(
             ["Model","R²","ΔR²"],
             [[f"Model 1: {x} + {w}", _fmt(r2_1), "—"],
