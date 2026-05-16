@@ -344,6 +344,26 @@ def render_mediation():
     df         = st.session_state["df"]
     constructs = st.session_state.get("constructs", {})
 
+    with st.expander("📖 How Mediation Works", expanded=False):
+        st.markdown("""
+**Mediation** tests whether M explains the X → Y relationship.
+
+```
+X ──(a)──► M ──(b)──► Y
+│                      ▲
+└──────────(c')────────┘
+```
+
+- **a path**: X → M
+- **b path**: M → Y (controlling for X)
+- **c' path**: X → Y direct effect (controlling for M)
+- **Indirect effect** = a × b (the mediated effect)
+- **Full mediation**: c' not significant, indirect significant
+- **Partial mediation**: both significant
+
+Significance tested via **Bootstrap BCa CI** — if CI does not contain zero, indirect is significant.
+        """)
+
     if len(constructs) < 3:
         st.warning("Mediation requires at least 3 constructs. Define more in Data Input.")
         return
@@ -355,6 +375,23 @@ def render_mediation():
 
     x_var, m_var, y_var, n_boot, ci_level = setup
     st.markdown("---")
+
+    # Check if required paths are defined
+    struct_paths = st.session_state.get("structural_paths", [])
+    x_m_defined  = any((str(p[0]) == str(x_var) and str(p[1]) == str(m_var)) for p in struct_paths)
+    x_y_defined  = any((str(p[0]) == str(x_var) and str(p[1]) == str(y_var)) for p in struct_paths)
+    m_y_defined  = any((str(p[0]) == str(m_var) and str(p[1]) == str(y_var)) for p in struct_paths)
+
+    if not (x_m_defined and x_y_defined and m_y_defined):
+        missing = []
+        if not x_m_defined: missing.append(f"{x_var} → {m_var}")
+        if not x_y_defined: missing.append(f"{x_var} → {y_var}")
+        if not m_y_defined: missing.append(f"{m_var} → {y_var}")
+        badge("warning",
+            f"Missing structural paths: {', '.join(missing)}. "
+            "Go to Data Input → Advanced Options → check 'Include mediation analysis?' "
+            "to auto-add these paths, or add them manually in Step 4."
+        )
 
     run_clicked = st.button("Run Mediation Analysis via R/lavaan", type="primary",
                              key="run_med_btn", use_container_width=True)
