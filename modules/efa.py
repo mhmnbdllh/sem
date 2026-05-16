@@ -384,6 +384,15 @@ def render_factor_naming(loadings_mat, n_factors):
         "Use the same names as defined in Data Input."
     )
 
+    # Auto-suggest: show which items meet loading threshold per factor
+    threshold = 0.40
+    st.caption(f"Items with |λ| ≥ {threshold} are highlighted as strong candidates for each factor.")
+    for f in [c for c in loadings_mat.columns if c.startswith("F")]:
+        strong = loadings_mat[f][loadings_mat[f].abs() >= threshold].sort_values(key=abs, ascending=False)
+        if not strong.empty:
+            items_str = ", ".join([f"{item} (λ={v:.3f})" for item, v in strong.items()])
+            st.caption(f"  {f} strong items: {items_str}")
+
     constructs      = st.session_state.get("constructs", {})
     construct_names = list(constructs.keys())
     factor_cols     = [f"F{i+1}" for i in range(n_factors) if f"F{i+1}" in loadings_mat.columns]
