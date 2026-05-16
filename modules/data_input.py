@@ -114,6 +114,21 @@ def validate_dataframe(df):
 
 def render_data_upload():
     st.subheader("Step 1: Upload Your Data")
+
+    # If data already loaded in this session, show it without requiring re-upload
+    cached_df = st.session_state.get("df")
+    if cached_df is not None and st.session_state.get("df_ready"):
+        st.success(f"Data already loaded: {cached_df.shape[0]:,} rows × {cached_df.shape[1]} columns.")
+        if st.button("Upload Different Dataset", key="reupload_btn"):
+            for key in ["df", "df_ready", "constructs", "structural_paths", "assignments",
+                        "cfa_result", "cfa_fit", "cfa_loadings", "cfa_metrics",
+                        "sem_result", "sem_fit", "sem_paths", "sem_r2",
+                        "mediation_results", "moderation_results", "invariance_results",
+                        "efa_result", "comparison_results"]:
+                st.session_state.pop(key, None)
+            st.rerun()
+        return cached_df
+
     use_demo = st.checkbox("Use demo dataset (n=300, 3 constructs, 9 items)", value=False, key="use_demo_checkbox")
     if use_demo:
         df = generate_demo_data()
@@ -122,7 +137,10 @@ def render_data_upload():
     uploaded = st.file_uploader("Upload CSV or Excel file", type=["csv", "xlsx", "xls"],
                                  help="Rows = respondents. Columns = questionnaire items.")
     if uploaded:
-        return load_file(uploaded)
+        df = load_file(uploaded)
+        if df is not None:
+            st.session_state["df"] = df
+        return df
     with st.expander("Expected Data Format"):
         st.markdown("""
 - Each row = one respondent
@@ -258,6 +276,14 @@ def render_data_input():
     df = render_data_upload()
     if df is None:
         return
+
+    # Add Reset Session button in sidebar-like area
+    with st.expander("🔄 Session Management", expanded=False):
+        st.markdown("Start a completely new analysis:")
+        if st.button("Reset Session (Clear All Data)", key="reset_session_btn", type="secondary"):
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            st.rerun()
     with st.expander("Data Preview", expanded=True):
         st.dataframe(df.head(10), use_container_width=True)
         st.caption(f"Shape: {df.shape[0]:,} rows x {df.shape[1]} columns")
