@@ -771,3 +771,86 @@ def render_cfa():
 
     st.markdown("---")
     badge("ok", "CFA complete. If the measurement model is satisfactory, proceed to Structural Model (SEM).")
+
+    # ── Edit Items directly from CFA ─────────────────────────────────
+    if result is not None and not st.session_state.get("cfa_complete"):
+        st.markdown("---")
+        st.subheader("🔧 Refine Measurement Model")
+        st.markdown(
+            "If fit is poor, remove weak items (λ < .50) directly here without going back to Data Input. "
+            "After saving, CFA will re-run automatically."
+        )
+
+        cfa_loadings_raw = result.get("loadings", [])
+        try:
+            import pandas as pd
+            if isinstance(cfa_loadings_raw, list):
+                load_df = pd.DataFrame(cfa_loadings_raw)
+            elif isinstance(cfa_loadings_raw, dict):
+                load_df = pd.DataFrame(cfa_loadings_raw)
+            else:
+                load_df = cfa_loadings_raw
+
+            col_map = {"construct":"construct","lhs":"construct","item":"item","rhs":"item","std":"std","std.all":"std"}
+            load_df = load_df.rename(columns=col_map)
+
+            # Build weak items dict per construct
+            weak_items = {}
+            for _, row in load_df.iterrows():
+                cname = str(row.get("construct",""))
+                item  = str(row.get("item",""))
+                try: std = float(row.get("std", 0))
+                except: std = 0
+                if abs(std) < 0.50 and cname and item:
+                    weak_items.setdefault(cname, []).append(f"{item} (λ={std:.3f})")
+
+            if weak_items:
+                st.markdown("**Weak items detected (λ < .50):**")
+                for cname, items in weak_items.items():
+                    st.caption(f"  {cname}: {', '.join(items)}")
+
+            new_constructs = {}
+            changed = False
+            for cname, items in constructs.items():
+                all_items = items
+                current   = st.session_state.get(f"cfa_edit_{cname}", items)
+                selected  = st.multiselect(
+                    f"Items for **{cname}** (remove weak items below):",
+                    options=all_items,
+                    default=[x for x in current if x in all_items],
+                    key=f"cfa_edit_{cname}",
+                )
+                if set(selected) != set(items):
+                    changed = True
+                new_constructs[cname] = selected
+
+            if st.button("💾 Save & Re-run CFA", type="primary", key="cfa_rerun_btn"):
+                # Validate minimum 3 items per construct
+                errors = [f"{c}: only {len(v)} item(s)" for c, v in new_constructs.items() if len(v) < 3]
+                if errors:
+                    badge("warning", f"Each construct needs at least 3 items. Issues: {', '.join(errors)}")
+                else:
+                    # Update session state
+                    st.session_state["constructs"] = new_constructs
+                    # Rebuild CFA syntax
+                    cfa_lines = [f"{c} =~ {' + '.join(v)}" for c, v in new_constructs.items() if v]
+                    st.session_state["cfa_syntax"] = "\n".join(cfa_lines)
+                    # Rebuild SEM syntax
+                    sem_lines = cfa_lines.copy()
+                    for pred, out in st.session_state.get("structural_paths", []):
+                        sem_lines.append(f"{out} ~ {pred}")
+                    st.session_state["sem_syntax"] = "\n".join(sem_lines)
+                    # Update JSON backup
+                    import json
+                    cfg = {"constructs": {k: list(v) for k,v in new_constructs.items()},
+                           "structural_paths": [list(p) for p in st.session_state.get("structural_paths", [])],
+                           "cfa_syntax": st.session_state["cfa_syntax"],
+                           "sem_syntax": st.session_state["sem_syntax"]}
+                    st.session_state["_model_config_json"] = json.dumps(cfg)
+                    # Clear old CFA results to force re-run
+                    for k in ["cfa_result","cfa_fit","cfa_loadings","cfa_metrics","cfa_complete"]:
+                        st.session_state.pop(k, None)
+                    badge("ok", "Items updated. CFA will re-run — scroll up and click 'Run CFA via R/lavaan'.")
+                    st.rerun()
+        except Exception as e:
+            st.caption(f"Edit panel unavailable: {str(e)}")
