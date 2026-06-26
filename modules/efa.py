@@ -88,6 +88,12 @@ def render_factorability(result):
             )
 
     factorable = (kmo is not None and float(kmo) >= 0.60) and (bart_p is not None and float(bart_p) < 0.05)
+    if not factorable and kmo is not None and float(kmo) < 0.60:
+        badge("warning",
+            f"KMO = {kmo:.3f} — data tidak cocok untuk EFA. "
+            "Saran: Lewati EFA dan langsung ke CFA menggunakan struktur konstruk dari Data Input. "
+            "Klik 'Skip EFA → Go to CFA' di bagian atas halaman ini."
+        )
     return factorable
 
 
@@ -466,32 +472,93 @@ def render_efa_summary(loadings_mat, n_factors, factor_names, item_names):
 
     st.session_state["efa_suggested_constructs"] = suggested
 
-    if st.button("Use EFA Results for CFA Model", type="primary", key="efa_to_cfa"):
-        st.session_state["constructs"] = suggested
-        # Rebuild CFA syntax
-        cfa_lines = [f"{c} =~ {' + '.join(items)}" for c, items in suggested.items() if items]
-        st.session_state["cfa_syntax"] = "\n".join(cfa_lines)
-        # Rebuild SEM syntax
-        sem_lines = cfa_lines.copy()
-        for pred, out in st.session_state.get("structural_paths", []):
-            sem_lines.append(f"{out} ~ {pred}")
-        st.session_state["sem_syntax"] = "\n".join(sem_lines)
-        badge("excellent", "EFA factor structure transferred to CFA. Navigate to CFA in the sidebar.")
+    # Check if all constructs have at least 3 items
+    all_ok = all(len(v) >= 3 for v in suggested.values())
+
+    if not all_ok:
+        badge("warning",
+            "Some constructs have fewer than 3 items based on EFA results. "
+            "This usually means cross-loadings are high or items don't cluster well. "
+            "Options: (1) Use original Data Input structure instead, "
+            "(2) Accept EFA structure and edit CFA syntax manually."
+        )
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("✅ Use EFA Results for CFA", type="primary", key="efa_to_cfa", use_container_width=True):
+            # Use original constructs from Data Input for items, EFA for factor assignment
+            # This ensures all items are preserved
+            original_constructs = st.session_state.get("constructs", {})
+            factor_names_map = st.session_state.get("efa_factor_names", {})
+
+            # Build new constructs: map original items to EFA-assigned factor names
+            new_constructs = {}
+            for fname, construct_name in factor_names_map.items():
+                # Get original items for this construct
+                orig_items = original_constructs.get(construct_name, [])
+                if orig_items:
+                    new_constructs[construct_name] = orig_items
+
+            # Fallback: if mapping fails, use original constructs
+            if not new_constructs:
+                new_constructs = original_constructs
+
+            st.session_state["constructs"] = new_constructs
+            cfa_lines = [f"{c} =~ {' + '.join(items)}" for c, items in new_constructs.items() if items]
+            st.session_state["cfa_syntax"] = "\n".join(cfa_lines)
+            sem_lines = cfa_lines.copy()
+            for pred, out in st.session_state.get("structural_paths", []):
+                sem_lines.append(f"{out} ~ {pred}")
+            st.session_state["sem_syntax"] = "\n".join(sem_lines)
+            # Save JSON backup
+            import json
+            cfg = {"constructs": {k: list(v) for k,v in new_constructs.items()},
+                   "structural_paths": [list(p) for p in st.session_state.get("structural_paths", [])],
+                   "cfa_syntax": st.session_state["cfa_syntax"],
+                   "sem_syntax": st.session_state["sem_syntax"]}
+            st.session_state["_model_config_json"] = json.dumps(cfg)
+            st.session_state["current_page"] = "cfa"
+            badge("excellent", "Structure transferred. Navigating to CFA automatically...")
+            st.rerun()
+
+    with col2:
+        if st.button("📋 Keep Data Input Structure", type="secondary", key="efa_keep_original", use_container_width=True):
+            # Use original constructs from Data Input unchanged
+            original_constructs = st.session_state.get("constructs", {})
+            cfa_lines = [f"{c} =~ {' + '.join(items)}" for c, items in original_constructs.items() if items]
+            st.session_state["cfa_syntax"] = "\n".join(cfa_lines)
+            sem_lines = cfa_lines.copy()
+            for pred, out in st.session_state.get("structural_paths", []):
+                sem_lines.append(f"{out} ~ {pred}")
+            st.session_state["sem_syntax"] = "\n".join(sem_lines)
+            st.session_state["current_page"] = "cfa"
+            badge("excellent", "Using original Data Input structure. Navigating to CFA...")
+            st.rerun()
 
     badge("ok",
-        "Note: EFA is data-driven. Ensure the suggested factor structure is "
-        "**theoretically justified** before proceeding to CFA. "
-        "Do not proceed to CFA solely based on EFA statistics."
+        "Note: EFA is data-driven. Always verify the factor structure is "
+        "theoretically justified before proceeding to CFA."
     )
 
 
 def render_efa():
     st.title("Exploratory Factor Analysis (EFA)")
-    st.markdown(
-        "EFA is used when the factor structure is **unknown or unconfirmed**. "
-        "It explores how items cluster empirically, providing the foundation for CFA.\n\n"
-        "> If your instrument has been validated in prior research, you may skip EFA and go directly to CFA."
-    )
+    st.markdown("EFA explores how items cluster empirically.")
+
+    with st.expander("❓ Do I need EFA? (Click to read)", expanded=not st.session_state.get("efa_complete")):
+        st.markdown("""
+**EFA adalah OPSIONAL.** Lewati EFA dan langsung ke CFA jika:
+- Instrumen kamu sudah divalidasi dari penelitian sebelumnya
+- Kamu sudah tahu item mana yang masuk ke konstruk mana
+
+**Jalankan EFA jika:**
+- Kamu mengembangkan instrumen baru
+- Kamu ingin memverifikasi struktur konstruk secara empiris
+        """)
+        if st.button("Lewati EFA → Langsung ke CFA", key="skip_efa_btn", type="secondary"):
+            st.session_state["efa_complete"] = True
+            st.session_state["current_page"] = "cfa"
+            st.rerun()
 
     if not st.session_state.get("df_ready"):
         st.warning("Please complete Data Input and Model Setup first.")
