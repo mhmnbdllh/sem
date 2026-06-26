@@ -234,8 +234,8 @@ def render_sidebar():
             <div style="font-size:1.3rem;font-weight:800;color:#1a6fa8">
                 SEM Studio
             </div>
-            <div style="font-size:0.8rem;color:#888;margin-top:2px">
-                Scripted by Dr. Muhaimin Abdullah, S.Pd., M.Pd.
+            <div style="font-size:0.7rem;color:#888;margin-top:2px">
+                Level 100 · R/lavaan Backend
             </div>
         </div>
         <hr style="margin:8px 0;border-color:#dde3ea"/>
@@ -258,6 +258,29 @@ def render_sidebar():
 
         progress = get_progress()
 
+        # Determine next recommended step
+        ordered_steps = ["data_input","descriptive","efa","cfa","sem","mediation","moderation","export"]
+        next_step = None
+        for step in ordered_steps:
+            if not progress.get(step, False):
+                next_step = step
+                break
+
+        # Step labels with numbers for mandatory steps
+        step_labels = {
+            "data_input":       "Step 1",
+            "descriptive":      "Step 2",
+            "efa":              "Step 3 (Optional)",
+            "cfa":              "Step 4",
+            "sem":              "Step 5",
+            "mediation":        "Optional",
+            "moderation":       "Optional",
+            "invariance":       "Optional",
+            "model_comparison": "Optional",
+            "visualization":    "Optional",
+            "export":           "Final Step",
+        }
+
         for label, key in PAGES.items():
             if key == "divider":
                 st.markdown(
@@ -270,24 +293,54 @@ def render_sidebar():
 
             done       = progress.get(key, False)
             is_current = st.session_state.get("current_page") == key
-            dot        = "🟢 " if done else "⚪ "
+            is_next    = key == next_step
+            step_label = step_labels.get(key, "")
+
+            if done:
+                icon = "✅"
+                color = "#1a7a4a"
+                bg = "#f0fff4"
+                border = "#1a7a4a"
+            elif is_next:
+                icon = "👉"
+                color = "#1a6fa8"
+                bg = "#e8f4fc"
+                border = "#2E86AB"
+            else:
+                icon = "⚪"
+                color = "#888"
+                bg = "transparent"
+                border = "transparent"
 
             if is_current:
                 st.markdown(
                     f'<div style="background:#e8f4fc;border-left:3px solid #2E86AB;'
-                    f'padding:6px 10px;border-radius:0 4px 4px 0;margin:1px 0;'
-                    f'font-size:0.88rem;color:#1a6fa8;font-weight:700">'
-                    f'{dot}{label}</div>',
+                    f'padding:6px 10px;border-radius:0 4px 4px 0;margin:1px 0">'
+                    f'<div style="font-size:0.88rem;color:#1a6fa8;font-weight:700">{icon} {label}</div>'
+                    f'<div style="font-size:0.68rem;color:#888">{step_label}</div>'
+                    f'</div>',
                     unsafe_allow_html=True,
                 )
             else:
                 if st.button(
-                    f"{dot}{label}",
+                    f"{icon} {label}",
                     key=f"nav_{key}",
                     use_container_width=True,
+                    help=step_label,
                 ):
                     st.session_state["current_page"] = key
                     st.rerun()
+
+        # Show next step guidance
+        if next_step and next_step != "data_input":
+            next_label = [l for l,k in PAGES.items() if k == next_step]
+            if next_label:
+                st.markdown(
+                    f'<div style="background:#fff8e1;border:1px solid #ffd54f;'
+                    f'border-radius:6px;padding:8px 10px;margin-top:8px;font-size:0.75rem;color:#7a6000">'
+                    f'👉 <b>Next:</b> {next_label[0]}</div>',
+                    unsafe_allow_html=True,
+                )
 
         st.markdown("<hr style='border-color:#dde3ea;margin:12px 0'/>", unsafe_allow_html=True)
 
@@ -326,7 +379,7 @@ def render_home():
             A complete, methodologically rigorous suite for
             <strong>Structural Equation Modeling</strong> and
             <strong>Confirmatory Factor Analysis</strong>.
-            Scripted by <strong>Dr. Muhaimin Abdullah, S.Pd., M.Pd.</strong> - SEM for Social Science.
+            Powered by <strong>R/lavaan</strong> — the gold standard for SEM.
         </p>
     </div>
     """, unsafe_allow_html=True)
