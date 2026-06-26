@@ -570,19 +570,33 @@ def render_sem_checklist(fit, path_results):
     st.session_state["sem_complete"] = True
     if n_fail == 0:
         badge("excellent",
-            f"All SEM criteria passed! {n_sig}/{n_total} hypotheses supported. "
-            "Proceed to Mediation/Moderation or Export Report. ✅"
+            f"All SEM criteria passed! {n_sig}/{n_total} hypotheses supported. ✅"
         )
     elif n_fail <= 2:
         badge("warning",
-            f"{n_fail} criterion/criteria require attention. "
-            "SEM results are available — proceed with caution."
+            f"{n_fail} criterion/criteria require attention. SEM results available."
         )
     else:
         badge("critical",
-            f"{n_fail} criteria not met. Re-examine model before reporting. "
-            "SEM results are available but may not be reliable."
+            f"{n_fail} criteria not met. SEM results available but may not be reliable."
         )
+
+    # Clear next step navigation
+    st.markdown("---")
+    st.markdown("**What would you like to do next?**")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("▶ Mediation Analysis →", key="sem_to_med_btn", use_container_width=True):
+            st.session_state["current_page"] = "mediation"
+            st.rerun()
+    with col2:
+        if st.button("▶ Moderation Analysis →", key="sem_to_mod_btn", use_container_width=True):
+            st.session_state["current_page"] = "moderation"
+            st.rerun()
+    with col3:
+        if st.button("▶ Export Report →", type="primary", key="sem_to_export_btn", use_container_width=True):
+            st.session_state["current_page"] = "export"
+            st.rerun()
 
 
 def render_sem():
