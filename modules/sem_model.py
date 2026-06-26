@@ -566,18 +566,23 @@ def render_sem_checklist(fit, path_results):
     )
 
     n_fail = sum(1 for v in checks.values() if not v)
+    # sem_complete = True as long as SEM ran successfully, regardless of fit criteria
+    st.session_state["sem_complete"] = True
     if n_fail == 0:
         badge("excellent",
             f"All SEM criteria passed! {n_sig}/{n_total} hypotheses supported. "
             "Proceed to Mediation/Moderation or Export Report. ✅"
         )
-        st.session_state["sem_complete"] = True
     elif n_fail <= 2:
-        badge("warning", f"{n_fail} criterion/criteria require attention.")
-        st.session_state["sem_complete"] = False
+        badge("warning",
+            f"{n_fail} criterion/criteria require attention. "
+            "SEM results are available — proceed with caution."
+        )
     else:
-        badge("critical", f"{n_fail} criteria not met. Re-examine model before reporting.")
-        st.session_state["sem_complete"] = False
+        badge("critical",
+            f"{n_fail} criteria not met. Re-examine model before reporting. "
+            "SEM results are available but may not be reliable."
+        )
 
 
 def render_sem():
