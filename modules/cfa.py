@@ -850,7 +850,22 @@ def render_cfa():
                     # Clear old CFA results to force re-run
                     for k in ["cfa_result","cfa_fit","cfa_loadings","cfa_metrics","cfa_complete"]:
                         st.session_state.pop(k, None)
-                    badge("ok", "Items updated. CFA will re-run — scroll up and click 'Run CFA via R/lavaan'.")
+                    badge("ok", "Items updated. Re-running CFA automatically...")
+                    # Auto-run CFA immediately using correct function
+                    from r_scripts.r_bridge import run_cfa, check_r_available
+                    new_syntax  = st.session_state["cfa_syntax"]
+                    estimator   = st.session_state.get("estimator", "MLR")
+                    indicator_cols = [item for items in new_constructs.values() for item in items]
+                    with st.spinner("Re-running CFA..."):
+                        new_result = run_cfa(df, indicator_cols, new_syntax, estimator)
+                    if new_result and not new_result.get("error"):
+                        st.session_state["cfa_result"]   = new_result
+                        st.session_state["cfa_fit"]      = new_result.get("fit", {})
+                        st.session_state["cfa_loadings"] = new_result.get("loadings", [])
+                        st.session_state["cfa_metrics"]  = new_result.get("reliability", {})
+                        badge("ok", "CFA re-run complete. Scroll up to see updated results.")
+                    else:
+                        badge("warning", f"CFA re-run failed: {new_result.get('error','Unknown error')}")
                     st.rerun()
         except Exception as e:
             st.caption(f"Edit panel unavailable: {str(e)}")
