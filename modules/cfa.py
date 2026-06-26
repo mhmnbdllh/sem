@@ -770,7 +770,33 @@ def render_cfa():
         render_cfa_checklist(fit, metrics)
 
     st.markdown("---")
-    badge("ok", "CFA complete. If the measurement model is satisfactory, proceed to Structural Model (SEM).")
+
+    # Clear next step navigation
+    cfa_fit = st.session_state.get("cfa_fit", {})
+    cfi = float(cfa_fit.get("cfi") or 0)
+    rmsea = float(cfa_fit.get("rmsea") or 1)
+    fit_ok = cfi >= 0.90 and rmsea <= 0.08
+
+    if fit_ok:
+        badge("excellent", "CFA fit is acceptable. You can proceed to SEM.")
+        if st.button("▶ Proceed to SEM →", type="primary", key="cfa_to_sem_btn", use_container_width=True):
+            st.session_state["current_page"] = "sem"
+            st.rerun()
+    else:
+        badge("warning",
+            f"CFA fit needs improvement (CFI={cfi:.3f}, RMSEA={rmsea:.3f}). "
+            "Use the 'Refine Measurement Model' panel below to remove weak items, "
+            "then re-run CFA. You can still proceed to SEM but results may not be reliable."
+        )
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🔧 Refine Items Below", type="secondary", key="go_refine_btn", use_container_width=True):
+                st.session_state["show_refine"] = True
+                st.rerun()
+        with col2:
+            if st.button("▶ Proceed to SEM Anyway →", type="secondary", key="cfa_to_sem_anyway", use_container_width=True):
+                st.session_state["current_page"] = "sem"
+                st.rerun()
 
     # ── Edit Items directly from CFA ─────────────────────────────────
     if result is not None and not st.session_state.get("cfa_complete"):
