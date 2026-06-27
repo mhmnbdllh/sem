@@ -15,7 +15,26 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 
-from utils.interpretation import badge, _safe_float, _fmt, _stars
+from utils.apa_tables import _safe_float, _fmt, _stars
+
+COLORS = {
+    "excellent": "#1a7a4a",
+    "good":      "#2ecc71",
+    "ok":        "#1a6fa8",
+    "warning":   "#b7770d",
+    "critical":  "#c0392b",
+}
+
+def badge(level, message):
+    color = COLORS.get(level, "#555555")
+    import re as _re
+    message = _re.sub(r'[*][*](.+?)[*][*]', r'<b>\\1</b>', str(message))
+    st.markdown(
+        f'<div style="background:{color}18;border-left:4px solid {color};'
+        f'padding:10px 14px;border-radius:4px;margin:6px 0;'
+        f'color:#1a1a1a;font-size:0.92rem">{message}</div>',
+        unsafe_allow_html=True,
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
