@@ -526,7 +526,10 @@ def render_efa_summary(loadings_mat, n_factors, factor_names, item_names):
     st.session_state["efa_suggested_constructs"] = final_constructs
 
     # Check if all constructs have at least 3 items
-    all_ok = all(len(v) >= 3 for v in suggested.values())
+    suggested = st.session_state.get("efa_suggested_constructs", final_constructs)
+    all_ok = bool(suggested) and all(
+        len(v) >= 3 for v in suggested.values() if isinstance(v, list)
+    )
 
     if not all_ok:
         badge("warning",
@@ -599,17 +602,19 @@ def render_efa():
     st.title("Exploratory Factor Analysis (EFA)")
     st.markdown("EFA explores how items cluster empirically.")
 
-    with st.expander("❓ Do I need EFA? (Click to read)", expanded=not st.session_state.get("efa_complete")):
+    with st.expander("❓ Do I need to run EFA? (Click to read)", expanded=not st.session_state.get("efa_complete")):
         st.markdown("""
-**EFA adalah OPSIONAL.** Lewati EFA dan langsung ke CFA jika:
-- Instrumen kamu sudah divalidasi dari penelitian sebelumnya
-- Kamu sudah tahu item mana yang masuk ke konstruk mana
+**EFA is OPTIONAL.** Skip EFA and go directly to CFA if:
+- Your instrument has been validated in prior published research
+- You already know which items belong to which construct
 
-**Jalankan EFA jika:**
-- Kamu mengembangkan instrumen baru
-- Kamu ingin memverifikasi struktur konstruk secara empiris
+**Run EFA if:**
+- You are developing a new instrument
+- You want to empirically verify your construct structure
+
+> **To skip:** Click the button below or navigate directly to CFA in the sidebar.
         """)
-        if st.button("Lewati EFA → Langsung ke CFA", key="skip_efa_btn", type="secondary"):
+        if st.button("Skip EFA → Go to CFA", key="skip_efa_btn", type="secondary"):
             st.session_state["efa_complete"] = True
             st.session_state["current_page"] = "cfa"
             st.rerun()
