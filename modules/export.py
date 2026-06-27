@@ -1038,6 +1038,136 @@ def generate_html_report():
     )
     sections.append(_html_section(17, "APA Results Narrative", s17, color="#555"))
 
+    # ── 17b: PLS-SEM Results (if available) ────────────────────────
+    pls_result = ss.get("pls_result")
+    if pls_result and not pls_result.get("error"):
+        pls_paths    = pls_result.get("paths", [])
+        pls_rel      = pls_result.get("reliability", {})
+        pls_fit      = pls_result.get("fit", {})
+        pls_r2       = pls_result.get("r2", [])
+        pls_loadings = pls_result.get("loadings", [])
+        pls_n        = pls_result.get("n", "?")
+        pls_boot     = pls_result.get("n_boot", 1000)
+        s_pls        = ""
+
+        # Outer loadings
+        if pls_loadings:
+            load_rows = []
+            for l in pls_loadings:
+                lam = _safe_float(l.get("loading"))
+                load_rows.append([
+                    l.get("construct","?"), l.get("item","?"),
+                    l.get("type","reflective").capitalize(),
+                    _fmt(lam), l.get("status","—"),
+                ])
+            s_pls += _html_tbl(
+                ["Construct","Item","Type","Loading/Weight","Status"],
+                load_rows,
+                "PLS-SEM Outer Model",
+                "Note: Reflective: λ ≥ .70 strong; λ ≥ .50 acceptable (Hair et al., 2022). "
+                "Formative: check VIF &lt; 5.0."
+            )
+
+        # Reliability
+        if pls_rel:
+            rel_rows = []
+            for cname, m in pls_rel.items():
+                rel_rows.append([
+                    cname,
+                    _fmt(_safe_float(m.get("alpha"))),
+                    _fmt(_safe_float(m.get("cr"))),
+                    _fmt(_safe_float(m.get("rho_a"))),
+                    _fmt(_safe_float(m.get("ave"))),
+                    "✅" if m.get("cr_ok") else "❌",
+                    "✅" if m.get("ave_ok") else "❌",
+                ])
+            s_pls += _html_tbl(
+                ["Construct","α","ρc","ρA","AVE","ρc OK","AVE OK"],
+                rel_rows,
+                "PLS-SEM Reliability and Validity",
+                "Note: ρc ≥ .70; ρA ≥ .70 (Dijkstra & Henseler, 2015); AVE ≥ .50 (Fornell & Larcker, 1981). "
+                "* p &lt; .05; ** p &lt; .01; *** p &lt; .001."
+            )
+
+        # Paths
+        if pls_paths:
+            path_rows = []
+            for i, p in enumerate(pls_paths, 1):
+                beta  = _safe_float(p.get("beta"))
+                t_val = _safe_float(p.get("t_stat"))
+                p_val = _safe_float(p.get("p_value"))
+                ci_lo = _safe_float(p.get("ci_lo"))
+                ci_hi = _safe_float(p.get("ci_hi"))
+                ci_str = f"[{ci_lo:.3f}, {ci_hi:.3f}]" if ci_lo is not None and ci_hi is not None else "—"
+                stars = ("***" if p_val and p_val < 0.001 else
+                         "**"  if p_val and p_val < 0.01  else
+                         "*"   if p_val and p_val < 0.05  else "ns")
+                path_rows.append([
+                    f"H{i}",
+                    f"{p.get('predictor','?')} → {p.get('outcome','?')}",
+                    f"{_fmt(beta)}{stars}",
+                    _fmt(t_val, 3), _fmt(p_val, 4), ci_str,
+                    p.get("decision","—"),
+                ])
+            s_pls += _html_tbl(
+                ["H","Path","β","t-stat","p-value","95% BCa CI","Decision"],
+                path_rows,
+                f"PLS-SEM Structural Paths (Bootstrap n = {pls_boot})",
+                "Note: β = standardized path coefficient. t-stat and CI via bootstrapping. "
+                "* p &lt; .05; ** p &lt; .01; *** p &lt; .001."
+            )
+            # Narratives
+            narratives = []
+            for i, p in enumerate(pls_paths, 1):
+                beta  = _safe_float(p.get("beta"))
+                p_val = _safe_float(p.get("p_value"))
+                supp  = p.get("supported", False)
+                if beta is not None:
+                    direction = "positive" if beta > 0 else "negative"
+                    strength  = "strong" if abs(beta) >= 0.50 else "moderate" if abs(beta) >= 0.30 else "weak"
+                    narratives.append(
+                        f"H{i} ({p.get('predictor','?')} → {p.get('outcome','?')}): "
+                        f"β = {beta:.3f}, {'supported' if supp else 'not supported'} "
+                        f"(p = {p_val:.4f if p_val else '—'}). Effect is {direction} and {strength}."
+                    )
+            if narratives:
+                s_pls += "<ul>" + "".join(f"<li>{n}</li>" for n in narratives) + "</ul>"
+
+        # R²
+        if pls_r2:
+            r2_rows = []
+            for r in pls_r2:
+                r2_val = _safe_float(r.get("r2"))
+                r2_rows.append([r.get("construct","?"), _fmt(r2_val), r.get("level","—")])
+            s_pls += _html_tbl(
+                ["Construct","R²","Level"], r2_rows,
+                "PLS-SEM Explained Variance",
+                "Note: ≥ .75 Substantial; ≥ .50 Moderate; ≥ .25 Weak (Hair et al., 2022)."
+            )
+
+        # Fit + APA narrative
+        srmr    = _safe_float(pls_fit.get("srmr"))
+        supp_n  = sum(1 for p in pls_paths if p.get("supported"))
+        total_p = len(pls_paths)
+        all_rel_ok = all(m.get("cr_ok") and m.get("ave_ok") for m in pls_rel.values()) if pls_rel else False
+
+        apa_pls = (
+            f"A PLS-SEM analysis was conducted using R/seminr (Rademaker & Schuberth, 2020) "
+            f"with n = {pls_n} cases and {pls_boot}-resample bootstrapping. "
+        )
+        if srmr is not None:
+            apa_pls += f"Model fit was {'acceptable' if srmr < 0.08 else 'below threshold'} (SRMR = {srmr:.3f}). "
+        apa_pls += (
+            f"Of {total_p} structural paths, {supp_n} were statistically significant (p &lt; .05). "
+        )
+        apa_pls += (
+            "All constructs demonstrated adequate reliability (ρc ≥ .70) and validity (AVE ≥ .50)."
+            if all_rel_ok else
+            "Note: Some reliability or validity criteria were not fully met."
+        )
+        s_pls += _html_badge("ok", apa_pls)
+        sections.append(_html_section(17, "PLS-SEM Analysis", s_pls))
+
     # ── 18. References ───────────────────────────────────────────
     refs = [
         ["Aiken, L. S., & West, S. G. (1991).", "Multiple regression: Testing and interpreting interactions. Sage."],
