@@ -308,9 +308,29 @@ def render_inner_model(result):
 
         supported = sum(1 for p in paths_data if p.get("supported"))
         total     = len(paths_data)
+        # Per-path narrative
+        st.markdown("**Path Interpretation:**")
+        for i, p in enumerate(paths_data, 1):
+            beta  = _safe_float(p.get("beta"))
+            p_val = _safe_float(p.get("p_value"))
+            pred  = p.get("predictor","?")
+            out   = p.get("outcome","?")
+            supp  = p.get("supported", False)
+            if beta is not None:
+                direction = "positive" if beta > 0 else "negative"
+                strength  = "strong" if abs(beta) >= 0.50 else "moderate" if abs(beta) >= 0.30 else "weak"
+                sig_txt   = f"statistically significant (p = {p_val:.4f})" if supp else f"not statistically significant (p = {p_val:.4f})"
+                st.markdown(
+                    f"**H{i}: {pred} → {out}** — β = {beta:.3f}, {sig_txt}. "
+                    f"The effect is {direction} and {strength}. "
+                    f"{'✅ Hypothesis supported.' if supp else '❌ Hypothesis not supported.'}"
+                )
+
+        # Overall interpretation
         badge(
             "excellent" if supported == total else "ok" if supported > 0 else "warning",
-            f"{supported} of {total} hypothesized path(s) are statistically significant (p < .05)."
+            f"{supported} of {total} hypothesized path(s) are statistically significant (p < .05). "
+            f"{'All hypotheses are supported.' if supported == total else f'{total-supported} hypothesis/hypotheses not supported — review theoretical justification.'}"
         )
 
     # VIF
@@ -555,6 +575,75 @@ def render_pls():
             f"PLS-SEM complete. n = {result.get('n','?')}, "
             f"{n_boot} bootstrap resamples."
         )
+        # Overall model narrative
+        st.markdown("---")
+        st.subheader("📋 Model Summary and Interpretation")
+
+        paths_data = result.get("paths", [])
+        rel        = result.get("reliability", {})
+        fit        = result.get("fit", {})
+        r2_data    = result.get("r2", [])
+        n_obs      = result.get("n", "?")
+        n_boot_res = result.get("n_boot", 1000)
+
+        supported  = sum(1 for p in paths_data if p.get("supported"))
+        total_p    = len(paths_data)
+        srmr       = _safe_float(fit.get("srmr"))
+        all_rel_ok = all(m.get("cr_ok") and m.get("ave_ok") for m in rel.values())
+
+        # Narrative
+        narrative_parts = [
+            f"A PLS-SEM analysis was conducted using R/seminr with n = {n_obs} complete cases "
+            f"and {n_boot_res}-resample bootstrapping for significance testing.",
+        ]
+
+        if srmr is not None:
+            fit_desc = "acceptable" if srmr < 0.08 else "below acceptable threshold"
+            narrative_parts.append(
+                f"Model fit was {fit_desc} (SRMR = {srmr:.3f}; threshold < .080; "
+                "Henseler et al., 2015)."
+            )
+
+        if all_rel_ok:
+            narrative_parts.append(
+                "All constructs demonstrated adequate reliability (ρc ≥ .70) "
+                "and convergent validity (AVE ≥ .50; Fornell & Larcker, 1981)."
+            )
+        else:
+            failed_rel = [c for c, m in rel.items() if not (m.get("cr_ok") and m.get("ave_ok"))]
+            narrative_parts.append(
+                f"Reliability or validity criteria were not fully met for: "
+                f"{', '.join(failed_rel)}. Interpret results with caution."
+            )
+
+        narrative_parts.append(
+            f"Of {total_p} hypothesized structural paths, "
+            f"{supported} were statistically significant (p < .05). "
+        )
+
+        for r2 in r2_data:
+            r2_val = _safe_float(r2.get("r2"))
+            if r2_val is not None:
+                narrative_parts.append(
+                    f"The model explains {r2_val:.1%} of variance in {r2.get('construct','?')} "
+                    f"(R² = {r2_val:.3f})."
+                )
+
+        narrative_parts.append(
+            "Note: PLS-SEM generates composite-based estimates rather than true latent variable scores. "
+            "Results should be interpreted in the context of prediction-oriented research goals "
+            "(Hair et al., 2022)."
+        )
+
+        for part in narrative_parts:
+            st.markdown(f"- {part}")
+
+        st.markdown("---")
+        badge("ok",
+            "PLS-SEM analysis complete. Use 'Export Report' to generate the full HTML report. "
+            "For theory-testing research, consider also running CB-SEM (lavaan) for comparison."
+        )
+
         if st.button("▶ Export Report →", type="primary",
                      key="pls_to_export_btn", use_container_width=True):
             st.session_state["current_page"] = "export"
