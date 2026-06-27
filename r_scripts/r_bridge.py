@@ -307,3 +307,69 @@ result <- run_model_comparison(data, models, "{estimator}")
         try: os.unlink(f)
         except: pass
     return res
+
+
+# =============================================================================
+# PLS-SEM Bridge
+# =============================================================================
+
+_PLS_SCRIPT_PATH = os.path.join(os.path.dirname(__file__), "pls_analysis.R")
+
+
+def run_plssem(df: pd.DataFrame,
+               constructs: dict,
+               paths: list,
+               construct_types: dict = None,
+               n_boot: int = 1000) -> dict:
+    """
+    Run PLS-SEM via seminr package.
+    
+    Parameters
+    ----------
+    df : DataFrame
+    constructs : dict  {name: [items]}
+    paths : list       [(from, to), ...]
+    construct_types : dict  {name: "reflective"|"formative"}
+    n_boot : int       Bootstrap resamples
+    """
+    all_items = [item for items in constructs.values() for item in items]
+    data = df[[c for c in all_items if c in df.columns]]
+    csv_path = _df_to_r_csv(data)
+
+    # Build R construct list
+    construct_r = "list(" + ", ".join(
+        f'"{k}"=c({",".join(repr(v) for v in vals)})'
+        for k, vals in constructs.items() if vals
+    ) + ")"
+
+    # Build R paths list
+    paths_r = "list(" + ", ".join(
+        f'c("{p[0]}", "{p[1]}")'
+        for p in paths
+    ) + ")"
+
+    # Build R construct_types list
+    if construct_types:
+        ct_r = "list(" + ", ".join(
+            f'"{k}"="{v}"' for k, v in construct_types.items()
+        ) + ")"
+    else:
+        ct_r = "NULL"
+
+    r_code = f"""
+source("{_escape(_PLS_SCRIPT_PATH)}")
+data       <- read.csv("{_escape(csv_path)}")
+constructs <- {construct_r}
+paths      <- {paths_r}
+ctypes     <- {ct_r}
+result     <- run_plssem(data, constructs, paths,
+                         construct_types = ctypes,
+                         n_boot = {n_boot}, seed = 42)
+.SEM_RESULT <- result
+"""
+    res = _run_r(r_code)
+    try:
+        os.unlink(csv_path)
+    except Exception:
+        pass
+    return res
