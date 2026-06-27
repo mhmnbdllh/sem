@@ -798,18 +798,21 @@ def render_cfa():
                 st.session_state["current_page"] = "sem"
                 st.rerun()
 
-    # ── Edit Items directly from CFA ─────────────────────────────────
-    if result is not None and not st.session_state.get("cfa_complete"):
+    # ── Refine Measurement Model — always visible after CFA run ──────
+    if result is not None:
         st.markdown("---")
         st.subheader("🔧 Refine Measurement Model")
         st.markdown(
-            "If fit is poor, remove weak items (λ < .50) directly here without going back to Data Input. "
-            "After saving, CFA will re-run automatically."
+            "Add or remove items for each construct based on factor loadings. "
+            "Items with λ < .50 are flagged as weak. "
+            "You can add back items that were previously removed. "
+            "Click **Save & Re-run CFA** to update results automatically."
         )
 
         cfa_loadings_raw = result.get("loadings", [])
         try:
-            import pandas as pd
+            import pandas as pd, json
+
             if isinstance(cfa_loadings_raw, list):
                 load_df = pd.DataFrame(cfa_loadings_raw)
             elif isinstance(cfa_loadings_raw, dict):
@@ -817,81 +820,132 @@ def render_cfa():
             else:
                 load_df = cfa_loadings_raw
 
-            col_map = {"construct":"construct","lhs":"construct","item":"item","rhs":"item","std":"std","std.all":"std"}
+            col_map = {"construct":"construct","lhs":"construct","item":"item",
+                       "rhs":"item","std":"std","std.all":"std"}
             load_df = load_df.rename(columns=col_map)
 
-            # Build weak items dict per construct
-            weak_items = {}
+            # Build loading lookup: item → (construct, lambda)
+            loading_lookup = {}
             for _, row in load_df.iterrows():
                 cname = str(row.get("construct",""))
                 item  = str(row.get("item",""))
                 try: std = float(row.get("std", 0))
                 except: std = 0
-                if abs(std) < 0.50 and cname and item:
-                    weak_items.setdefault(cname, []).append(f"{item} (λ={std:.3f})")
+                if cname and item:
+                    loading_lookup[item] = (cname, std)
 
-            if weak_items:
-                st.markdown("**Weak items detected (λ < .50):**")
-                for cname, items in weak_items.items():
-                    st.caption(f"  {cname}: {', '.join(items)}")
+            # ALL items from original Data Input (so user can add back removed items)
+            original_constructs = {}
+            try:
+                cfg_json = st.session_state.get("_model_config_json","")
+                if cfg_json:
+                    cfg_orig = json.loads(cfg_json)
+                    original_constructs = cfg_orig.get("constructs", {})
+            except: pass
+            if not original_constructs:
+                original_constructs = constructs
 
             new_constructs = {}
-            changed = False
-            for cname, items in constructs.items():
-                all_items = items
-                current   = st.session_state.get(f"cfa_edit_{cname}", items)
-                selected  = st.multiselect(
-                    f"Items for **{cname}** (remove weak items below):",
-                    options=all_items,
-                    default=[x for x in current if x in all_items],
+            for cname, current_items in constructs.items():
+                # Pool = all items ever assigned to this construct (original + current)
+                orig_items = original_constructs.get(cname, [])
+                pool = list(dict.fromkeys(orig_items + current_items))  # preserve order, no dupes
+
+                # Build display labels with loading info
+                def item_label(item):
+                    if item in loading_lookup:
+                        _, lam = loading_lookup[item]
+                        flag = " ⚠️ weak" if abs(lam) < 0.50 else " ✅"
+                        return f"{item} (λ={lam:.3f}{flag})"
+                    return item
+
+                # Recommendations
+                weak_in_current = [item for item in current_items
+                                   if item in loading_lookup and abs(loading_lookup[item][1]) < 0.50]
+                if weak_in_current:
+                    badge("warning",
+                        f"**{cname}** — Recommended to remove: "
+                        f"{', '.join([f'{i} (λ={loading_lookup[i][1]:.3f})' for i in weak_in_current])}. "
+                        "Items with λ < .50 contribute little to construct validity."
+                    )
+
+                # Restore previous selection if exists
+                prev_sel = st.session_state.get(f"cfa_edit_{cname}", current_items)
+                valid_prev = [x for x in prev_sel if x in pool]
+
+                selected = st.multiselect(
+                    f"**{cname}** — select items to include:",
+                    options=pool,
+                    default=valid_prev if valid_prev else current_items,
+                    format_func=item_label,
                     key=f"cfa_edit_{cname}",
+                    help=f"Original items: {', '.join(orig_items)}. "
+                         "Items with λ < .50 are flagged as weak. "
+                         "You can add back previously removed items."
                 )
-                if set(selected) != set(items):
-                    changed = True
                 new_constructs[cname] = selected
 
-            if st.button("💾 Save & Re-run CFA", type="primary", key="cfa_rerun_btn"):
-                # Validate minimum 3 items per construct
-                errors = [f"{c}: only {len(v)} item(s)" for c, v in new_constructs.items() if len(v) < 3]
-                if errors:
-                    badge("warning", f"Each construct needs at least 3 items. Issues: {', '.join(errors)}")
-                else:
-                    # Update session state
-                    st.session_state["constructs"] = new_constructs
-                    # Rebuild CFA syntax
-                    cfa_lines = [f"{c} =~ {' + '.join(v)}" for c, v in new_constructs.items() if v]
-                    st.session_state["cfa_syntax"] = "\n".join(cfa_lines)
-                    # Rebuild SEM syntax
-                    sem_lines = cfa_lines.copy()
-                    for pred, out in st.session_state.get("structural_paths", []):
-                        sem_lines.append(f"{out} ~ {pred}")
-                    st.session_state["sem_syntax"] = "\n".join(sem_lines)
-                    # Update JSON backup
-                    import json
-                    cfg = {"constructs": {k: list(v) for k,v in new_constructs.items()},
-                           "structural_paths": [list(p) for p in st.session_state.get("structural_paths", [])],
-                           "cfa_syntax": st.session_state["cfa_syntax"],
-                           "sem_syntax": st.session_state["sem_syntax"]}
-                    st.session_state["_model_config_json"] = json.dumps(cfg)
-                    # Clear old CFA results to force re-run
-                    for k in ["cfa_result","cfa_fit","cfa_loadings","cfa_metrics","cfa_complete"]:
-                        st.session_state.pop(k, None)
-                    badge("ok", "Items updated. Re-running CFA automatically...")
-                    # Auto-run CFA immediately using correct function
-                    from r_scripts.r_bridge import run_cfa, check_r_available
-                    new_syntax  = st.session_state["cfa_syntax"]
-                    estimator   = st.session_state.get("estimator", "MLR")
-                    indicator_cols = [item for items in new_constructs.values() for item in items]
-                    with st.spinner("Re-running CFA..."):
-                        new_result = run_cfa(df, indicator_cols, new_syntax, estimator)
-                    if new_result and not new_result.get("error"):
-                        st.session_state["cfa_result"]   = new_result
-                        st.session_state["cfa_fit"]      = new_result.get("fit", {})
-                        st.session_state["cfa_loadings"] = new_result.get("loadings", [])
-                        st.session_state["cfa_metrics"]  = new_result.get("reliability", {})
-                        badge("ok", "CFA re-run complete. Scroll up to see updated results.")
-                    else:
-                        badge("warning", f"CFA re-run failed: {new_result.get('error','Unknown error')}")
+            # Reset to original button
+            col_reset, col_save = st.columns([1, 2])
+            with col_reset:
+                if st.button("↩ Reset to Original Items", key="cfa_reset_items_btn",
+                             type="secondary", use_container_width=True):
+                    for cname in constructs:
+                        orig = original_constructs.get(cname, constructs[cname])
+                        key = f"cfa_edit_{cname}"
+                        if key in st.session_state:
+                            del st.session_state[key]
                     st.rerun()
+
+            with col_save:
+                if st.button("💾 Save & Re-run CFA", type="primary",
+                             key="cfa_rerun_btn", use_container_width=True):
+                    errors = [f"{c}: only {len(v)} item(s)"
+                              for c, v in new_constructs.items() if len(v) < 3]
+                    if errors:
+                        badge("warning",
+                            f"Each construct needs at least 3 items. "
+                            f"Issues: {', '.join(errors)}"
+                        )
+                    else:
+                        st.session_state["constructs"] = new_constructs
+                        cfa_lines = [f"{c} =~ {' + '.join(v)}"
+                                     for c, v in new_constructs.items() if v]
+                        st.session_state["cfa_syntax"] = "\n".join(cfa_lines)
+                        sem_lines = cfa_lines.copy()
+                        for pred, out in st.session_state.get("structural_paths", []):
+                            sem_lines.append(f"{out} ~ {pred}")
+                        st.session_state["sem_syntax"] = "\n".join(sem_lines)
+                        cfg = {
+                            "constructs": {k: list(v) for k,v in new_constructs.items()},
+                            "structural_paths": [list(p) for p in
+                                                 st.session_state.get("structural_paths", [])],
+                            "cfa_syntax": st.session_state["cfa_syntax"],
+                            "sem_syntax": st.session_state["sem_syntax"],
+                        }
+                        st.session_state["_model_config_json"] = json.dumps(cfg)
+                        for k in ["cfa_result","cfa_fit","cfa_loadings",
+                                  "cfa_metrics","cfa_complete"]:
+                            st.session_state.pop(k, None)
+
+                        from r_scripts.r_bridge import run_cfa
+                        new_syntax     = st.session_state["cfa_syntax"]
+                        estimator      = st.session_state.get("recommended_estimator","MLR")
+                        indicator_cols = [item for items in new_constructs.values()
+                                          for item in items]
+                        with st.spinner("Re-running CFA with updated items..."):
+                            new_result = run_cfa(df, indicator_cols, new_syntax, estimator)
+
+                        if new_result and not new_result.get("error"):
+                            st.session_state["cfa_result"]   = new_result
+                            st.session_state["cfa_fit"]      = new_result.get("fit", {})
+                            st.session_state["cfa_loadings"] = new_result.get("loadings", [])
+                            st.session_state["cfa_metrics"]  = new_result.get("reliability",{})
+                            badge("ok", "✅ CFA updated. Scroll up to see new results.")
+                        else:
+                            err = new_result.get("error","Unknown") if new_result else "Unknown"
+                            badge("warning", f"CFA re-run failed: {err}")
+                        st.rerun()
+
         except Exception as e:
-            st.caption(f"Edit panel unavailable: {str(e)}")
+            st.caption(f"Refine panel unavailable: {str(e)}")
