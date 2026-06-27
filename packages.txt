@@ -4,4 +4,3 @@ r-cran-semtools
 r-cran-psych
 r-cran-gparotation
 r-cran-jsonlite
-r-cran-seminr
