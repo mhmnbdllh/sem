@@ -451,10 +451,14 @@ def render_factor_naming(loadings_mat, n_factors):
 
 def render_efa_summary(loadings_mat, n_factors, factor_names, item_names):
     st.subheader("Step 7: EFA Summary and CFA Preparation")
-    st.markdown("Suggested construct structure for CFA based on EFA results.")
+    st.markdown(
+        "Review the suggested item structure below. "
+        "You can **add or remove items** per construct before proceeding to CFA. "
+        "Recommendations are based on factor loadings."
+    )
 
     factor_cols = [f"F{i+1}" for i in range(n_factors) if f"F{i+1}" in loadings_mat.columns]
-    suggested   = {}
+    suggested_auto = {}
 
     for f in factor_cols:
         fname = factor_names.get(f, f)
@@ -463,14 +467,63 @@ def render_efa_summary(loadings_mat, n_factors, factor_names, item_names):
             if loadings_mat.loc[item, factor_cols].abs().idxmax() == f
             and abs(loadings_mat.loc[item, f]) >= 0.40
         ]
-        suggested[fname] = primary_items
-        n = len(primary_items)
-        status = "OK" if n >= 3 else "Warning"
-        st.markdown(f"**{fname}** ({n} items): {', '.join(primary_items)}")
-        if n < 3:
-            badge("warning", f"{fname} has only {n} item(s). CFA requires at least 3 indicators.")
+        suggested_auto[fname] = primary_items
 
-    st.session_state["efa_suggested_constructs"] = suggested
+    # Allow user to edit item assignments
+    all_items = list(loadings_mat.index)
+    original_constructs = st.session_state.get("constructs", {})
+
+    def item_label_efa(item, construct_name):
+        # Find best loading for this item
+        row = loadings_mat.loc[item, factor_cols].abs()
+        best_f = row.idxmax()
+        best_v = loadings_mat.loc[item, best_f]
+        fname  = factor_names.get(best_f, best_f)
+        flag   = " ⚠️" if abs(best_v) < 0.50 else " ✅" if abs(best_v) >= 0.70 else ""
+        return f"{item} (λ={best_v:.3f} on {best_f}/{fname}){flag}"
+
+    final_constructs = {}
+    for fname, auto_items in suggested_auto.items():
+        # Pool: all items from original + EFA suggestions
+        orig_items  = original_constructs.get(fname, [])
+        pool        = list(dict.fromkeys(orig_items + all_items))
+        prev_sel    = st.session_state.get(f"efa_edit_{fname}", auto_items)
+        valid_prev  = [x for x in prev_sel if x in pool]
+
+        # Show recommendations
+        weak_items = [i for i in auto_items
+                      if abs(loadings_mat.loc[i, [f for f in factor_cols
+                            if factor_names.get(f,f)==fname][0]]
+                             if [f for f in factor_cols if factor_names.get(f,f)==fname]
+                             else 0) < 0.50]
+        strong_items = [i for i in auto_items if i not in weak_items]
+
+        if weak_items:
+            badge("warning",
+                f"**{fname}**: {len(strong_items)} strong items (λ ≥ .50), "
+                f"{len(weak_items)} weak items (λ < .50): {', '.join(weak_items)}. "
+                "Consider removing weak items."
+            )
+        elif auto_items:
+            badge("ok",
+                f"**{fname}**: {len(auto_items)} items, all with λ ≥ .50. ✅"
+            )
+
+        selected = st.multiselect(
+            f"**{fname}** — items to include in CFA:",
+            options=pool,
+            default=valid_prev if valid_prev else auto_items,
+            format_func=lambda item, fn=fname: item_label_efa(item, fn),
+            key=f"efa_edit_{fname}",
+            help="Add or remove items. Items with λ ≥ .70 are strong, λ ≥ .50 acceptable, λ < .50 weak."
+        )
+
+        n = len(selected)
+        if n < 3:
+            badge("warning", f"**{fname}** has only {n} item(s). CFA requires at least 3.")
+        final_constructs[fname] = selected
+
+    st.session_state["efa_suggested_constructs"] = final_constructs
 
     # Check if all constructs have at least 3 items
     all_ok = all(len(v) >= 3 for v in suggested.values())
@@ -483,56 +536,57 @@ def render_efa_summary(loadings_mat, n_factors, factor_names, item_names):
             "(2) Accept EFA structure and edit CFA syntax manually."
         )
 
+    import json
+
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("✅ Use EFA Results for CFA", type="primary", key="efa_to_cfa", use_container_width=True):
-            # Use original constructs from Data Input for items, EFA for factor assignment
-            # This ensures all items are preserved
-            original_constructs = st.session_state.get("constructs", {})
-            factor_names_map = st.session_state.get("efa_factor_names", {})
-
-            # Build new constructs: map original items to EFA-assigned factor names
-            new_constructs = {}
-            for fname, construct_name in factor_names_map.items():
-                # Get original items for this construct
-                orig_items = original_constructs.get(construct_name, [])
-                if orig_items:
-                    new_constructs[construct_name] = orig_items
-
-            # Fallback: if mapping fails, use original constructs
+        if st.button("✅ Use EFA Structure for CFA", type="primary",
+                     key="efa_to_cfa", use_container_width=True):
+            # Use the user-edited constructs from Step 7
+            new_constructs = st.session_state.get("efa_suggested_constructs", {})
             if not new_constructs:
-                new_constructs = original_constructs
-
-            st.session_state["constructs"] = new_constructs
-            cfa_lines = [f"{c} =~ {' + '.join(items)}" for c, items in new_constructs.items() if items]
-            st.session_state["cfa_syntax"] = "\n".join(cfa_lines)
-            sem_lines = cfa_lines.copy()
-            for pred, out in st.session_state.get("structural_paths", []):
-                sem_lines.append(f"{out} ~ {pred}")
-            st.session_state["sem_syntax"] = "\n".join(sem_lines)
-            # Save JSON backup
-            import json
-            cfg = {"constructs": {k: list(v) for k,v in new_constructs.items()},
-                   "structural_paths": [list(p) for p in st.session_state.get("structural_paths", [])],
-                   "cfa_syntax": st.session_state["cfa_syntax"],
-                   "sem_syntax": st.session_state["sem_syntax"]}
-            st.session_state["_model_config_json"] = json.dumps(cfg)
-            st.session_state["current_page"] = "cfa"
-            badge("excellent", "Structure transferred. Navigating to CFA automatically...")
-            st.rerun()
+                badge("warning", "No EFA structure available. Run EFA first.")
+            else:
+                errors = [c for c, v in new_constructs.items() if len(v) < 3]
+                if errors:
+                    badge("warning",
+                        f"These constructs have fewer than 3 items: {', '.join(errors)}. "
+                        "Please add more items above."
+                    )
+                else:
+                    st.session_state["constructs"] = new_constructs
+                    cfa_lines = [f"{c} =~ {' + '.join(items)}"
+                                 for c, items in new_constructs.items() if items]
+                    st.session_state["cfa_syntax"] = "\n".join(cfa_lines)
+                    sem_lines = cfa_lines.copy()
+                    for pred, out in st.session_state.get("structural_paths", []):
+                        sem_lines.append(f"{out} ~ {pred}")
+                    st.session_state["sem_syntax"] = "\n".join(sem_lines)
+                    cfg = {
+                        "constructs": {k: list(v) for k,v in new_constructs.items()},
+                        "structural_paths": [list(p) for p in
+                                             st.session_state.get("structural_paths",[])],
+                        "cfa_syntax": st.session_state["cfa_syntax"],
+                        "sem_syntax": st.session_state["sem_syntax"],
+                    }
+                    st.session_state["_model_config_json"] = json.dumps(cfg)
+                    st.session_state["current_page"] = "cfa"
+                    badge("excellent", "✅ Structure transferred. Navigating to CFA...")
+                    st.rerun()
 
     with col2:
-        if st.button("📋 Keep Data Input Structure", type="secondary", key="efa_keep_original", use_container_width=True):
-            # Use original constructs from Data Input unchanged
+        if st.button("📋 Keep Original Data Input Structure", type="secondary",
+                     key="efa_keep_original", use_container_width=True):
             original_constructs = st.session_state.get("constructs", {})
-            cfa_lines = [f"{c} =~ {' + '.join(items)}" for c, items in original_constructs.items() if items]
+            cfa_lines = [f"{c} =~ {' + '.join(items)}"
+                         for c, items in original_constructs.items() if items]
             st.session_state["cfa_syntax"] = "\n".join(cfa_lines)
             sem_lines = cfa_lines.copy()
             for pred, out in st.session_state.get("structural_paths", []):
                 sem_lines.append(f"{out} ~ {pred}")
             st.session_state["sem_syntax"] = "\n".join(sem_lines)
             st.session_state["current_page"] = "cfa"
-            badge("excellent", "Using original Data Input structure. Navigating to CFA...")
+            badge("excellent", "✅ Using original structure. Navigating to CFA...")
             st.rerun()
 
     badge("ok",
