@@ -7,6 +7,13 @@
 # =============================================================================
 
 suppressPackageStartupMessages({
+  # Install seminr if not available (not in Debian apt, must install from CRAN)
+  if (!requireNamespace("seminr", quietly = TRUE)) {
+    install.packages("seminr",
+                     repos  = "https://cran.r-project.org",
+                     quiet  = TRUE,
+                     dependencies = TRUE)
+  }
   library(seminr)
   library(jsonlite)
 })
