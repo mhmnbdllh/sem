@@ -37,6 +37,7 @@ from modules.invariance       import render_invariance
 from modules.model_comparison import render_model_comparison
 from modules.visualization    import render_visualization
 from modules.export           import render_export
+from modules.pls              import render_pls
 
 # ── Global CSS ───────────────────────────────────────────────────
 st.markdown("""
@@ -146,6 +147,7 @@ PAGES = {
     "📑 Model Comparison":             "model_comparison",
     "── SPRINT 5 ──":                  "divider",
     "🗺️ Path Diagram and Visuals":     "visualization",
+    "🔬 PLS-SEM":                      "pls",
     "📤 Export Report":                "export",
 }
 
@@ -160,6 +162,7 @@ RENDER = {
     "invariance":       render_invariance,
     "model_comparison": render_model_comparison,
     "visualization":    render_visualization,
+    "pls":              render_pls,
     "export":           render_export,
 }
 
@@ -220,6 +223,7 @@ def get_progress():
         "invariance":       bool(ss.get("invariance_results")),
         "model_comparison": bool(ss.get("comparison_results")),
         "visualization":    ss.get("df_ready", False),
+        "pls":              bool(ss.get("pls_complete")),
         "export":           ss.get("df_ready", False),
     }
 
@@ -278,6 +282,7 @@ def render_sidebar():
             "invariance":       "Optional",
             "model_comparison": "Optional",
             "visualization":    "Optional",
+            "pls":              "Optional (PLS-SEM)",
             "export":           "Final Step",
         }
 
