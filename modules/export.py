@@ -544,6 +544,29 @@ def generate_html_report():
     s5 = _html_tbl(["Index","Value","Criterion","Interpretation"], cfa_fit_rows,
         "CFA Goodness-of-Fit Indices",
         "Note: Hu & Bentler (1999); Kline (2016); Jöreskog & Sörbom (1984).")
+
+    # Add descriptive overall CFA fit interpretation
+    cfi_val   = _safe_float(cfa_fit.get("cfi"))
+    rmsea_val = _safe_float(cfa_fit.get("rmsea"))
+    srmr_val  = _safe_float(cfa_fit.get("srmr"))
+    tli_val   = _safe_float(cfa_fit.get("tli"))
+    n_cfa     = _safe_float(cfa_fit.get("n")) or ss.get("cfa_n")
+
+    if cfi_val is not None and rmsea_val is not None:
+        cfi_desc  = ("excellent" if cfi_val >= 0.97 else "good" if cfi_val >= 0.95
+                     else "acceptable" if cfi_val >= 0.90 else "poor")
+        rmsea_desc= ("excellent" if rmsea_val <= 0.05 else "acceptable"
+                     if rmsea_val <= 0.08 else "poor")
+        fit_overall = (cfi_val >= 0.90 and rmsea_val <= 0.08)
+        level = "excellent" if cfi_val >= 0.95 and rmsea_val <= 0.06 else "ok" if fit_overall else "warning"
+        n_str = f" (n = {int(n_cfa)})" if n_cfa else ""
+        s5 += _html_badge(level,
+            f"Overall CFA fit{n_str}: CFI = {cfi_val:.3f} ({cfi_desc}), "
+            f"RMSEA = {rmsea_val:.3f} ({rmsea_desc}), "
+            f"SRMR = {srmr_val:.3f if srmr_val else '—'}. "
+            f"{'The measurement model demonstrates adequate fit to the data.' if fit_overall else 'The measurement model fit is below acceptable thresholds — consider removing weak items or re-specifying the model.'} "
+            "Evaluate multiple fit indices jointly (Hu & Bentler, 1999)."
+        )
     sections.append(_html_section(5, "CFA Model Fit", s5))
 
     # ── 6. Factor Loadings ────────────────────────────────────────
@@ -694,16 +717,37 @@ def generate_html_report():
         "Note: β = standardized path coefficient. * p < .05; ** p < .01; *** p < .001. "
         "Cohen's f²: ≥ .02 small; ≥ .15 medium; ≥ .35 large (Cohen, 1988)."
     )
-    # Add overall path interpretation
+    # Add detailed per-path narrative and overall interpretation
     if path_rows_html:
         supported   = sum(1 for p in sem_paths if (_safe_float(p.get("p")) or 1) < 0.05)
         total_paths = len(sem_paths)
+
+        # Per-path description
+        path_narratives = []
+        for i, p in enumerate(sem_paths, 1):
+            beta  = _safe_float(p.get("beta"))
+            p_val = _safe_float(p.get("p"))
+            pred  = p.get("predictor","?")
+            out   = p.get("outcome","?")
+            sig   = p_val is not None and p_val < 0.05
+            if beta is not None:
+                direction = "positive" if beta > 0 else "negative"
+                strength  = ("strong" if abs(beta) >= 0.50 else
+                             "moderate" if abs(beta) >= 0.30 else "weak")
+                sig_txt   = "statistically significant" if sig else "not statistically significant"
+                path_narratives.append(
+                    f"H{i} ({pred} → {out}): β = {beta:.3f}, {sig_txt} "
+                    f"(p = {p_val:.4f}). The effect is {direction} and {strength}."
+                )
+        if path_narratives:
+            s9 += "<ul>" + "".join(f"<li>{n}</li>" for n in path_narratives) + "</ul>"
+
         s9 += _html_badge(
             "excellent" if supported == total_paths else "ok" if supported > 0 else "warning",
             f"{supported} of {total_paths} hypothesized path(s) are statistically significant (p < .05). "
-            "Significant paths support the hypothesized relationships. "
             "Note: * p &lt; .05; ** p &lt; .01; *** p &lt; .001. "
-            "Beta = standardized path coefficient; larger absolute values indicate stronger effects."
+            "β = standardized path coefficient (effect size); SE = standard error; "
+            "larger |β| indicates stronger effect."
         )
     sections.append(_html_section(9, "Structural Path Coefficients", s9))
 
@@ -725,11 +769,25 @@ def generate_html_report():
         "Explained Variance (R²) for Endogenous Constructs",
         "Note: R² ≥ .26 = substantial; ≥ .13 = moderate; ≥ .02 = weak (Cohen, 1988).")
     if r2_rows_html:
+        # Per-construct R2 narrative
+        r2_narratives = []
+        for row in sem_r2:
+            if isinstance(row, dict):
+                r2_val = _safe_float(row.get("R2"))
+                cname  = row.get("Construct","?")
+                if r2_val is not None:
+                    level_r2 = ("substantial" if r2_val >= 0.26 else
+                                "moderate"    if r2_val >= 0.13 else "weak")
+                    r2_narratives.append(
+                        f"{cname}: R² = {r2_val:.3f} ({r2_val:.1%}) — "
+                        f"predictors explain a {level_r2} proportion of variance."
+                    )
+        if r2_narratives:
+            s10 += "<ul>" + "".join(f"<li>{n}</li>" for n in r2_narratives) + "</ul>"
         s10 += _html_badge("ok",
             "R² indicates the proportion of variance in each endogenous construct "
             "explained by its predictors. "
-            "Benchmarks: R² ≥ .26 = substantial; ≥ .13 = moderate; ≥ .02 = weak (Cohen, 1988). "
-            "Higher R² indicates the model explains more variance in the outcome construct."
+            "Benchmarks (Cohen, 1988): R² ≥ .26 = substantial; ≥ .13 = moderate; ≥ .02 = weak."
         )
     sections.append(_html_section(10, "Explained Variance (R²)", s10))
 
@@ -1090,9 +1148,9 @@ def generate_html_report():
 </style>
 </head>
 <body>
-<h1>SEM Studio Analysis Report by Dr. Muhaimin Abdullah, S.Pd., M.Pd.</h1>
-<p style="color:#000;font-size:0.95rem;margin-top:4px">
-  Generated: {now} &nbsp;|&nbsp; Scripted by Dr. Muhaimin Abdullah, S.Pd., M.Pd. Powered by R/lavaan (Rosseel, 2012) &nbsp;|&nbsp; n = {n}
+<h1>SEM Studio Analysis Report</h1>
+<p style="color:#888;font-size:0.82rem;margin-top:4px">
+  Generated: {now} &nbsp;|&nbsp; Powered by R/lavaan (Rosseel, 2012) &nbsp;|&nbsp; n = {n}
 </p>
 <hr style="border:none;border-top:1px solid #dde3ea;margin:16px 0">
 {toc_html}
