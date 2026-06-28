@@ -1,11 +1,11 @@
 """
 pls.py — PLS-SEM Analysis Module
 =================================
-Partial Least Squares Structural Equation Modeling via seminr (R).
+Partial Least Squares Structural Equation Modeling via R (composite-based).
 
 Methodological references:
   Hair et al. (2022) A Primer on Partial Least Squares SEM, 3rd ed.
-  Rademaker & Schuberth (2020) seminr package
+  Hair et al. (2022) PLS-SEM methodology
   Henseler et al. (2015) HTMT criterion
   Dijkstra & Henseler (2015) rho_A reliability
 """
@@ -462,14 +462,14 @@ def render_fit(result):
 def render_pls():
     st.title("PLS-SEM Analysis")
     st.markdown(
-        "**Partial Least Squares Structural Equation Modeling** via R/seminr. "
+        "**Partial Least Squares Structural Equation Modeling** via R. "
         "PLS-SEM is suitable for prediction-oriented research, non-normal data, "
         "and smaller sample sizes."
     )
 
     with st.expander("📖 CB-SEM vs PLS-SEM — When to use which?", expanded=False):
         st.markdown("""
-| Criterion | CB-SEM (lavaan) | PLS-SEM (seminr) |
+| Criterion | CB-SEM (lavaan) | PLS-SEM (R) |
 |---|---|---|
 | Goal | Theory testing | Prediction |
 | Sample size | Large (n ≥ 200) | Smaller (n ≥ 30) |
@@ -518,7 +518,7 @@ def render_pls():
         f"Bootstrap: **{n_boot} resamples**."
     )
 
-    if st.button("▶ Run PLS-SEM via R/seminr", type="primary",
+    if st.button("▶ Run PLS-SEM via R", type="primary",
                  key="run_pls_btn", use_container_width=True):
 
         from r_scripts.r_bridge import run_plssem, check_r_available
@@ -541,13 +541,12 @@ def render_pls():
 
         if result.get("error"):
             err = result["error"]
-            if "seminr" in err.lower() or "there is no package" in err.lower():
-                st.error(
-                    "The 'seminr' R package is not installed on this server. "
-                    "Please add 'r-cran-seminr' to packages.txt and redeploy."
-                )
-            else:
+            if "sample size" in err.lower():
                 st.error(f"PLS-SEM failed: {err}")
+            elif "not found in dataset" in err.lower():
+                st.error(f"Item mismatch: {err}")
+            else:
+                st.error(f"PLS-SEM estimation failed: {err}")
             return
 
         st.session_state["pls_result"] = result
@@ -593,7 +592,7 @@ def render_pls():
 
         # Narrative
         narrative_parts = [
-            f"A PLS-SEM analysis was conducted using R/seminr with n = {n_obs} complete cases "
+            f"A PLS-SEM analysis was conducted using composite-based PLS (Hair et al., 2022) with n = {n_obs} complete cases "
             f"and {n_boot_res}-resample bootstrapping for significance testing.",
         ]
 
