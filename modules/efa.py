@@ -494,151 +494,144 @@ def render_factor_naming(loadings_mat, n_factors):
 
 
 def render_efa_summary(loadings_mat, n_factors, factor_names, item_names):
+    """
+    Step 7: EFA Summary.
+    - Factors shown as F1/F2/F3 (neutral R labels)
+    - Original construct names ALWAYS preserved
+    - Users can edit items per construct
+    - Optional rename at the end
+    """
     st.subheader("Step 7: EFA Summary and CFA Preparation")
+
+    factor_cols         = [f"F{i+1}" for i in range(n_factors) if f"F{i+1}" in loadings_mat.columns]
+    original_constructs = st.session_state.get("constructs", {})
+    all_items           = list(loadings_mat.index)
+
+    # ── Factor overview ────────────────────────────────────────────────────
+    st.markdown("**EFA Factor Overview** (F1, F2, F3... are statistical labels from R):")
+    for f in factor_cols:
+        primary = [str(i) for i in loadings_mat.index
+                   if loadings_mat.loc[i, factor_cols].abs().idxmax() == f]
+        item_origins = {}
+        for item in primary[:8]:
+            for cname, citems in original_constructs.items():
+                if item in citems:
+                    item_origins[item] = cname
+                    break
+        unique_origins = list(dict.fromkeys(item_origins.values()))
+        cross = len(unique_origins) > 1
+        display = []
+        for item in primary[:6]:
+            lam    = loadings_mat.loc[item, f]
+            origin = item_origins.get(item, "?")
+            flag   = "✅" if abs(lam) >= 0.50 else "⚠️"
+            display.append(f"{flag} {item}[{origin}] λ={lam:.3f}")
+        label = f"**{f}** {'⚠️ Cross-loading' if cross else '✅ Clean'} | {', '.join(unique_origins)}"
+        with st.expander(label, expanded=cross):
+            st.markdown(" | ".join(display))
+            if len(primary) > 6:
+                st.caption(f"... and {len(primary)-6} more items")
+
+    st.markdown("---")
     st.markdown(
-        "Review the suggested item structure below. "
-        "You can **add or remove items** per construct before proceeding to CFA. "
-        "Recommendations are based on factor loadings."
+        "**Item assignment for CFA** — construct names from Data Input are preserved. "
+        "Add or remove items based on EFA loadings shown above."
     )
 
-    factor_cols = [f"F{i+1}" for i in range(n_factors) if f"F{i+1}" in loadings_mat.columns]
-    suggested_auto = {}
-
-    for f in factor_cols:
-        fname = factor_names.get(f, f)
-        primary_items = [
-            str(item) for item in loadings_mat.index
-            if loadings_mat.loc[item, factor_cols].abs().idxmax() == f
-            and abs(loadings_mat.loc[item, f]) >= 0.40
-        ]
-        suggested_auto[fname] = primary_items
-
-    # Allow user to edit item assignments
-    all_items = list(loadings_mat.index)
-    original_constructs = st.session_state.get("constructs", {})
-
-    def item_label_efa(item, construct_name):
-        # Find best loading for this item
-        row = loadings_mat.loc[item, factor_cols].abs()
-        best_f = row.idxmax()
-        best_v = loadings_mat.loc[item, best_f]
-        fname  = factor_names.get(best_f, best_f)
-        flag   = " ⚠️" if abs(best_v) < 0.50 else " ✅" if abs(best_v) >= 0.70 else ""
-        return f"{item} (λ={best_v:.3f} on {best_f}/{fname}){flag}"
-
+    # ── Item editing per construct ─────────────────────────────────────────
     final_constructs = {}
-    for fname, auto_items in suggested_auto.items():
-        # Pool: all items from original + EFA suggestions
-        orig_items  = original_constructs.get(fname, [])
-        pool        = list(dict.fromkeys(orig_items + all_items))
-        prev_sel    = st.session_state.get(f"efa_edit_{fname}", auto_items)
-        valid_prev  = [x for x in prev_sel if x in pool]
+    for orig_name, orig_items in original_constructs.items():
+        # Suggest items: those in original construct with λ ≥ .40
+        suggested = [i for i in orig_items
+                     if i in all_items and
+                     abs(loadings_mat.loc[i, loadings_mat.loc[i, factor_cols].abs().idxmax()]) >= 0.40]
+        if not suggested:
+            suggested = orig_items  # fallback to original
 
-        # Show recommendations
-        weak_items = [i for i in auto_items
-                      if abs(loadings_mat.loc[i, [f for f in factor_cols
-                            if factor_names.get(f,f)==fname][0]]
-                             if [f for f in factor_cols if factor_names.get(f,f)==fname]
-                             else 0) < 0.50]
-        strong_items = [i for i in auto_items if i not in weak_items]
+        pool       = list(dict.fromkeys(orig_items + all_items))
+        prev_sel   = st.session_state.get(f"efa_edit_{orig_name}", suggested)
+        valid_prev = [x for x in prev_sel if x in pool]
 
-        if weak_items:
-            badge("warning",
-                f"**{fname}**: {len(strong_items)} strong items (λ ≥ .50), "
-                f"{len(weak_items)} weak items (λ < .50): {', '.join(weak_items)}. "
-                "Consider removing weak items."
-            )
-        elif auto_items:
-            badge("ok",
-                f"**{fname}**: {len(auto_items)} items, all with λ ≥ .50. ✅"
-            )
+        def item_lbl(item, fc=factor_cols, oc=original_constructs):
+            if item not in loadings_mat.index:
+                return item
+            best_f   = loadings_mat.loc[item, fc].abs().idxmax()
+            best_lam = loadings_mat.loc[item, best_f]
+            origin   = next((c for c,ci in oc.items() if item in ci), "?")
+            flag     = "✅" if abs(best_lam) >= 0.50 else "⚠️"
+            return f"{item} [{origin}] λ={best_lam:.3f} on {best_f} {flag}"
 
         selected = st.multiselect(
-            f"**{fname}** — items to include in CFA:",
+            f"**{orig_name}** — items for CFA:",
             options=pool,
-            default=valid_prev if valid_prev else auto_items,
-            format_func=lambda item, fn=fname: item_label_efa(item, fn),
-            key=f"efa_edit_{fname}",
-            help="Add or remove items. Items with λ ≥ .70 are strong, λ ≥ .50 acceptable, λ < .50 weak."
+            default=valid_prev if valid_prev else suggested,
+            format_func=item_lbl,
+            key=f"efa_edit_{orig_name}",
         )
-
         n = len(selected)
         if n < 3:
-            badge("warning", f"**{fname}** has only {n} item(s). CFA requires at least 3.")
-        final_constructs[fname] = selected
+            badge("warning", f"**{orig_name}**: only {n} item(s). CFA requires at least 3.")
+        elif n > 0:
+            weak = [i for i in selected
+                    if i in all_items and
+                    abs(loadings_mat.loc[i, loadings_mat.loc[i, factor_cols].abs().idxmax()]) < 0.50]
+            if weak:
+                badge("warning", f"**{orig_name}**: {len(weak)} weak item(s) (λ < .50): {', '.join(weak)}.")
+            else:
+                badge("ok", f"**{orig_name}**: {n} items, all λ ≥ .50. ✅")
+        final_constructs[orig_name] = selected
 
     st.session_state["efa_suggested_constructs"] = final_constructs
 
-    # Check if all constructs have at least 3 items
-    suggested = st.session_state.get("efa_suggested_constructs", final_constructs)
-    all_ok = bool(suggested) and all(
-        len(v) >= 3 for v in suggested.values() if isinstance(v, list)
-    )
-
-    if not all_ok:
-        badge("warning",
-            "Some constructs have fewer than 3 items based on EFA results. "
-            "This usually means cross-loadings are high or items don't cluster well. "
-            "Options: (1) Use original Data Input structure instead, "
-            "(2) Accept EFA structure and edit CFA syntax manually."
+    # ── Optional rename ────────────────────────────────────────────────────
+    st.markdown("---")
+    with st.expander("✏️ Optional: Rename Constructs", expanded=False):
+        st.info(
+            "Rename constructs here if EFA suggests a different theoretical interpretation. "
+            "All names will be updated consistently across CFA and SEM."
         )
+        renamed = {}
+        for orig_name in list(original_constructs.keys()):
+            new_name = st.text_input(
+                f"Rename '{orig_name}':",
+                value=st.session_state.get(f"rename_val_{orig_name}", orig_name),
+                key=f"rename_{orig_name}",
+            )
+            renamed[orig_name] = new_name.strip() if new_name.strip() else orig_name
 
-    import json
-
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("✅ Use EFA Structure for CFA", type="primary",
-                     key="efa_to_cfa", use_container_width=True):
-            # Use the user-edited constructs from Step 7
-            new_constructs = st.session_state.get("efa_suggested_constructs", {})
-            if not new_constructs:
-                badge("warning", "No EFA structure available. Run EFA first.")
+        if st.button("✅ Apply Renames", key="apply_rename_btn", type="secondary"):
+            if len(set(renamed.values())) < len(renamed):
+                badge("warning", "Duplicate names. Each construct must have a unique name.")
             else:
-                errors = [c for c, v in new_constructs.items() if len(v) < 3]
-                if errors:
-                    badge("warning",
-                        f"These constructs have fewer than 3 items: {', '.join(errors)}. "
-                        "Please add more items above."
-                    )
+                changed = {o: n for o, n in renamed.items() if o != n}
+                if not changed:
+                    badge("ok", "No changes applied.")
                 else:
-                    st.session_state["constructs"] = new_constructs
-                    cfa_lines = [f"{c} =~ {' + '.join(items)}"
-                                 for c, items in new_constructs.items() if items]
+                    old_c = st.session_state.get("constructs", {})
+                    new_c = {renamed.get(k, k): v for k, v in old_c.items()}
+                    st.session_state["constructs"] = new_c
+                    old_paths = st.session_state.get("structural_paths", [])
+                    new_paths = [(renamed.get(p[0],p[0]), renamed.get(p[1],p[1])) for p in old_paths]
+                    st.session_state["structural_paths"] = new_paths
+                    cfa_lines = [f"{c} =~ {' + '.join(items)}" for c, items in new_c.items() if items]
                     st.session_state["cfa_syntax"] = "\n".join(cfa_lines)
                     sem_lines = cfa_lines.copy()
-                    for pred, out in st.session_state.get("structural_paths", []):
+                    for pred, out in new_paths:
                         sem_lines.append(f"{out} ~ {pred}")
                     st.session_state["sem_syntax"] = "\n".join(sem_lines)
-                    cfg = {
-                        "constructs": {k: list(v) for k,v in new_constructs.items()},
-                        "structural_paths": [list(p) for p in
-                                             st.session_state.get("structural_paths",[])],
-                        "cfa_syntax": st.session_state["cfa_syntax"],
-                        "sem_syntax": st.session_state["sem_syntax"],
-                    }
+                    import json
+                    cfg = {"constructs": {k: list(v) for k,v in new_c.items()},
+                           "structural_paths": [list(p) for p in new_paths],
+                           "cfa_syntax": st.session_state["cfa_syntax"],
+                           "sem_syntax": st.session_state["sem_syntax"]}
                     st.session_state["_model_config_json"] = json.dumps(cfg)
-                    st.session_state["current_page"] = "cfa"
-                    badge("excellent", "✅ Structure transferred. Navigating to CFA...")
+                    badge("excellent", f"Renamed: {', '.join([f'{o}→{n}' for o,n in changed.items()])}. Updated consistently.")
                     st.rerun()
 
-    with col2:
-        if st.button("📋 Keep Original Data Input Structure", type="secondary",
-                     key="efa_keep_original", use_container_width=True):
-            original_constructs = st.session_state.get("constructs", {})
-            cfa_lines = [f"{c} =~ {' + '.join(items)}"
-                         for c, items in original_constructs.items() if items]
-            st.session_state["cfa_syntax"] = "\n".join(cfa_lines)
-            sem_lines = cfa_lines.copy()
-            for pred, out in st.session_state.get("structural_paths", []):
-                sem_lines.append(f"{out} ~ {pred}")
-            st.session_state["sem_syntax"] = "\n".join(sem_lines)
-            st.session_state["current_page"] = "cfa"
-            badge("excellent", "✅ Using original structure. Navigating to CFA...")
-            st.rerun()
-
     badge("ok",
-        "Note: EFA is data-driven. Always verify the factor structure is "
-        "theoretically justified before proceeding to CFA."
+        "Note: EFA is data-driven. Ensure the suggested factor structure is "
+        "theoretically justified before proceeding to CFA. "
+        "Do not proceed to CFA solely based on EFA statistics."
     )
 
 
