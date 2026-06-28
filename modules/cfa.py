@@ -729,6 +729,19 @@ def render_cfa():
     df         = st.session_state["df"]
     constructs = st.session_state.get("constructs", {})
 
+    # Validate construct names vs dataset columns
+    if constructs and df is not None:
+        all_items = [item for items in constructs.values() for item in items]
+        missing   = [i for i in all_items if i not in df.columns]
+        if missing:
+            st.error(
+                f"**Item mismatch detected:** {', '.join(missing[:10])} "
+                f"not found in dataset. "
+                "Go to Data Input and ensure item names match your dataset column names exactly. "
+                "Check for typos, spaces, or capitalization differences."
+            )
+            return
+
     # Restore from JSON if constructs lost (e.g. after Streamlit restart)
     if not constructs and st.session_state.get("_model_config_json"):
         import json
