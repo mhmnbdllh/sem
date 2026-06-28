@@ -634,6 +634,16 @@ def render_sem():
     constructs       = st.session_state.get("constructs", {})
     structural_paths = st.session_state.get("structural_paths", [])
 
+    # Validate item names before running
+    if constructs and df is not None:
+        all_items = [item for items in constructs.values() for item in items]
+        missing   = [i for i in all_items if i not in df.columns]
+        if missing:
+            st.error(
+                f"**Item mismatch:** {', '.join(missing[:10])} not found in dataset. "
+                "Go to Data Input and verify item names match your dataset columns exactly."
+            )
+
     # Restore from JSON if constructs lost
     if not constructs and st.session_state.get("_model_config_json"):
         import json
