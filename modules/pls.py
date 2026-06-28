@@ -558,6 +558,14 @@ def render_pls():
     result = st.session_state.get("pls_result")
     if result and not result.get("error"):
         st.markdown("---")
+        # Clearly label this as PLS-SEM output
+        method = result.get("method", "Composite-based PLS")
+        st.success(
+            f"**PLS-SEM Results** — {method}. "
+            f"n = {result.get('n','?')}, "
+            f"Bootstrap = {result.get('n_boot',1000)} resamples. "
+            "Note: These are PLS-SEM estimates, NOT CB-SEM (lavaan) estimates."
+        )
         render_outer_model(result)
         st.markdown("---")
         render_reliability(result)
