@@ -380,70 +380,114 @@ def render_factor_naming_setup(n_factors_expected):
 
 def render_factor_naming(loadings_mat, n_factors):
     """
-    Step shown AFTER seeing factor loading results.
-    User assigns construct names based on which items load on each factor.
+    Step 6: Factor identification with cross-loading detection.
+    Factors default to F1/F2/F3 labels. Users can optionally map to construct names
+    only when items clearly belong to one construct.
     """
-    st.subheader("Step 6: Assign Construct Names to Factors")
-    st.markdown(
-        "Based on the loading matrix above, assign a construct name to each factor. "
-        "Look at which items load highest on each factor, then select the matching construct. "
-        "Use the same names as defined in Data Input."
-    )
-
-    # Auto-suggest: show which items meet loading threshold per factor
-    threshold = 0.40
-    st.caption(f"Items with |λ| ≥ {threshold} are highlighted as strong candidates for each factor.")
-    for f in [c for c in loadings_mat.columns if c.startswith("F")]:
-        strong = loadings_mat[f][loadings_mat[f].abs() >= threshold].sort_values(key=abs, ascending=False)
-        if not strong.empty:
-            items_str = ", ".join([f"{item} (λ={v:.3f})" for item, v in strong.items()])
-            st.caption(f"  {f} strong items: {items_str}")
+    st.subheader("Step 6: Identify and Name Factors")
 
     constructs      = st.session_state.get("constructs", {})
     construct_names = list(constructs.keys())
     factor_cols     = [f"F{i+1}" for i in range(n_factors) if f"F{i+1}" in loadings_mat.columns]
 
-    if construct_names:
-        reminder_lines = ["Constructs from Data Input (for reference):"]
-        for cname, items in constructs.items():
-            reminder_lines.append(f"  - {cname}: {', '.join(items)}")
-        st.info("\n".join(reminder_lines))
+    st.info(
+        "**How to name factors:** If the top items on a factor all belong to the same construct "
+        "(e.g., all UIUX items), name it after that construct. "
+        "If items from **different constructs** load on the same factor (cross-loading), "
+        "keep the default F1/F2/F3 label — this indicates measurement overlap in your data."
+    )
 
-    OPTIONS      = construct_names + ["[ Custom name... ]"]
-    factor_names = {}
+    if construct_names:
+        with st.expander("📋 Reference: Your constructs from Data Input"):
+            for cname, items in constructs.items():
+                st.markdown(f"- **{cname}**: {', '.join(items)}")
+
+    factor_names        = {}
+    has_cross_loading   = False
 
     for i, f in enumerate(factor_cols):
-        top_items = loadings_mat[f].abs().nlargest(3).index.tolist()
-        top_str   = ", ".join([f"{item} (λ={loadings_mat.loc[item,f]:.3f})" for item in top_items])
+        st.markdown(f"---")
+        top5      = loadings_mat[f].abs().nlargest(5)
+        top_items = top5.index.tolist()
+
+        # Identify which constructs top items belong to
+        item_to_construct = {}
+        for item in top_items:
+            for cname, citems in constructs.items():
+                if item in citems:
+                    item_to_construct[item] = cname
+                    break
+
+        unique_cons = list(dict.fromkeys(item_to_construct.values()))
 
         c1, c2 = st.columns([2, 3])
         with c1:
-            saved       = st.session_state.get(f"efa_fname_{f}", "")
-            default_idx = construct_names.index(saved) if saved in construct_names else min(i, max(0, len(construct_names)-1))
-            selected    = st.selectbox(
-                f"{f} name",
-                options=OPTIONS,
-                index=default_idx,
+            if len(unique_cons) > 1:
+                has_cross_loading = True
+                st.warning(
+                    f"**{f}** — Cross-loading: items from "
+                    f"{len(unique_cons)} constructs ({', '.join(unique_cons)}). "
+                    f"Recommended: keep as **{f}**."
+                )
+                default_name = f
+            elif len(unique_cons) == 1:
+                st.success(f"**{f}** — items predominantly from **{unique_cons[0]}**.")
+                default_name = unique_cons[0]
+            else:
+                default_name = f
+
+            options = [f] + [c for c in construct_names if c != f] + ["[ Custom... ]"]
+            saved   = st.session_state.get(f"efa_fname_{f}", default_name)
+            try:
+                def_idx = options.index(saved)
+            except ValueError:
+                def_idx = 0
+
+            selected = st.selectbox(
+                f"Name for {f}:",
+                options=options,
+                index=def_idx,
                 key=f"efa_fname_{f}",
+                help=(
+                    f"Keep as '{f}' if cross-loading is detected. "
+                    "Use a construct name only if items clearly belong to that construct."
+                )
             )
-            if selected == "[ Custom name... ]":
-                prev   = saved if saved and saved not in construct_names else ""
-                custom = st.text_input(f"Custom name for {f}", value=prev, key=f"efa_custom_{f}")
-                name   = custom.strip() if custom.strip() else f"Factor{i+1}"
+            if selected == "[ Custom... ]":
+                prev   = saved if saved not in options else ""
+                custom = st.text_input(f"Custom name for {f}:", value=prev,
+                                       key=f"efa_custom_{f}")
+                name   = custom.strip() if custom.strip() else f
             else:
                 name = selected
+
         with c2:
-            st.markdown(f"**Top items loading on {f}:** {top_str}")
+            st.markdown(f"**Top items on {f}:**")
+            for item in top_items:
+                lam   = loadings_mat.loc[item, f]
+                cname = item_to_construct.get(item, "?")
+                flag  = "✅" if abs(lam) >= 0.50 else "⚠️"
+                st.markdown(f"  - {flag} {item} [{cname}] λ = {lam:.3f}")
 
         factor_names[f] = name
 
+    # Warnings
+    if has_cross_loading:
+        badge("warning",
+            "Cross-loading detected in one or more factors. "
+            "This suggests items are not measuring distinct constructs. "
+            "Consider: (1) removing cross-loading items in the CFA Refine panel, "
+            "(2) using 'Keep Data Input Structure' instead of EFA structure."
+        )
+
     values = list(factor_names.values())
     if len(set(values)) < len(values):
-        badge("warning", "Duplicate names detected. Each factor should have a unique name.")
-    elif all(v in construct_names for v in values):
-        badge("ok", "All factor names match Data Input constructs. Consistency ensured.")
+        badge("warning",
+            "Duplicate factor names detected. Each factor must have a unique name. "
+            "If two factors seem to measure the same construct, reduce the number of factors."
+        )
     else:
-        badge("ok", "Factor names set. Ensure custom names are consistent with structural paths.")
+        badge("ok", "Factor names assigned. Review the summary below before proceeding to CFA.")
 
     st.session_state["efa_factor_names"] = factor_names
     return factor_names
