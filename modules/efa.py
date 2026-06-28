@@ -406,7 +406,7 @@ def render_factor_naming(loadings_mat, n_factors):
     has_cross_loading   = False
 
     for i, f in enumerate(factor_cols):
-        st.markdown(f"---")
+        st.markdown("---")
         top5      = loadings_mat[f].abs().nlargest(5)
         top_items = top5.index.tolist()
 
