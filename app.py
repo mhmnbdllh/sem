@@ -439,9 +439,12 @@ def render_home():
     st.subheader("Your Analysis Pipeline")
     progress = get_progress()
     keys  = list(RENDER.keys())
-    icons = ["📂","📊","🔍","📐","🔗","🔄","⚖️","👥","📑","🗺️","📤"]
+    icons = ["📂","📊","🔍","📐","🔗","🔄","⚖️","👥","📑","🔬","🗺️","📤"]
     names = ["Data","Desc","EFA","CFA","SEM","Mediation",
-             "Moderation","Invariance","Compare","Diagram","Export"]
+             "Moderation","Invariance","Compare","PLS-SEM","Diagram","Export"]
+    # Ensure icons/names match keys length
+    icons = (icons + ["❓"] * len(keys))[:len(keys)]
+    names = (names + ["?"]  * len(keys))[:len(keys)]
 
     cols = st.columns(len(keys))
     for i, key in enumerate(keys):
