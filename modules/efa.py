@@ -178,15 +178,15 @@ def render_loadings_table(result, item_names, n_factors):
     elif isinstance(loadings_raw, dict):
         loadings_mat = pd.DataFrame(loadings_raw)
     elif isinstance(loadings_raw, list):
-        if len(loadings_raw) > 0 and isinstance(loadings_raw[0], list):
-            actual_cols = len(loadings_raw[0])
-        else:
-            actual_cols = n_factors
-        loadings_mat = pd.DataFrame(
-            np.array(loadings_raw),
-            index=item_names[:len(loadings_raw)],
-            columns=[f"F{i+1}" for i in range(actual_cols)]
-        )
+        arr = np.array(loadings_raw)
+        if arr.ndim == 1:
+            arr = arr.reshape(-1, 1)
+        actual_rows = arr.shape[0]
+        actual_cols = arr.shape[1] if arr.ndim > 1 else 1
+        idx_labels  = (item_names[:actual_rows] if len(item_names) >= actual_rows
+                       else item_names + [f"item_{i}" for i in range(len(item_names), actual_rows)])
+        loadings_mat = pd.DataFrame(arr, index=idx_labels,
+                                    columns=[f"F{i+1}" for i in range(actual_cols)])
     else:
         st.warning("Could not parse loadings.")
         return None
@@ -380,114 +380,69 @@ def render_factor_naming_setup(n_factors_expected):
 
 def render_factor_naming(loadings_mat, n_factors):
     """
-    Step 6: Factor identification with cross-loading detection.
-    Factors default to F1/F2/F3 labels. Users can optionally map to construct names
-    only when items clearly belong to one construct.
+    Step 6: Factor Loading Summary — DISPLAY ONLY.
+    Factors are ALWAYS labeled F1/F2/F3. No user renaming here.
+    CFA always uses construct names from Data Input.
     """
-    st.subheader("Step 6: Identify and Name Factors")
-
-    constructs      = st.session_state.get("constructs", {})
-    construct_names = list(constructs.keys())
-    factor_cols     = [f"F{i+1}" for i in range(n_factors) if f"F{i+1}" in loadings_mat.columns]
-
+    st.subheader("Step 6: Factor Loading Summary")
     st.info(
-        "**How to name factors:** If the top items on a factor all belong to the same construct "
-        "(e.g., all UIUX items), name it after that construct. "
-        "If items from **different constructs** load on the same factor (cross-loading), "
-        "keep the default F1/F2/F3 label — this indicates measurement overlap in your data."
+        "Factors are labeled **F1, F2, F3, ...** (fixed labels). "
+        "These labels are for display only and do **not** affect construct names. "
+        "CFA and SEM always use the names defined in Data Input."
     )
 
-    if construct_names:
-        with st.expander("📋 Reference: Your constructs from Data Input"):
-            for cname, items in constructs.items():
-                st.markdown(f"- **{cname}**: {', '.join(items)}")
+    constructs   = st.session_state.get("constructs", {})
+    factor_cols  = [f"F{i+1}" for i in range(n_factors) if f"F{i+1}" in loadings_mat.columns]
+    factor_names = {f: f for f in factor_cols}  # F1→F1, F2→F2 always
 
-    factor_names        = {}
-    has_cross_loading   = False
-
-    for i, f in enumerate(factor_cols):
-        st.markdown("---")
+    for f in factor_cols:
         top5      = loadings_mat[f].abs().nlargest(5)
         top_items = top5.index.tolist()
 
-        # Identify which constructs top items belong to
-        item_to_construct = {}
+        item_origins = {}
         for item in top_items:
             for cname, citems in constructs.items():
                 if item in citems:
-                    item_to_construct[item] = cname
+                    item_origins[item] = cname
                     break
 
-        unique_cons = list(dict.fromkeys(item_to_construct.values()))
+        unique_origins = list(dict.fromkeys(item_origins.values()))
+        cross = len(unique_origins) > 1
 
-        c1, c2 = st.columns([2, 3])
-        with c1:
-            if len(unique_cons) > 1:
-                has_cross_loading = True
+        # Build item description
+        item_desc = []
+        for item in top_items:
+            lam    = loadings_mat.loc[item, f]
+            origin = item_origins.get(item, "?")
+            flag   = "✅" if abs(lam) >= 0.50 else "⚠️"
+            item_desc.append(f"{flag} **{item}** [{origin}] λ={lam:.3f}")
+
+        label = f"**{f}**"
+        if cross:
+            label += f" ⚠️ Cross-loading (items from: {', '.join(unique_origins)})"
+        else:
+            label += f" ✅ Clean (items from: {', '.join(unique_origins) if unique_origins else '?'})"
+
+        with st.expander(label, expanded=False):
+            st.markdown(" | ".join(item_desc))
+            # Show ALL items loading on this factor (not just top 5)
+            all_on_f = [(item, loadings_mat.loc[item, f])
+                        for item in loadings_mat.index
+                        if loadings_mat.loc[item, factor_cols].abs().idxmax() == f]
+            all_on_f.sort(key=lambda x: abs(x[1]), reverse=True)
+            all_desc = []
+            for item, lam in all_on_f:
+                origin = next((c for c, ci in constructs.items() if item in ci), "?")
+                flag   = "✅" if abs(lam) >= 0.50 else "⚠️"
+                all_desc.append(f"{flag} {item}[{origin}] λ={lam:.3f}")
+            st.caption("All items primarily loading on this factor: " + " | ".join(all_desc))
+            if cross:
                 st.warning(
-                    f"**{f}** — Cross-loading: items from "
-                    f"{len(unique_cons)} constructs ({', '.join(unique_cons)}). "
-                    f"Recommended: keep as **{f}**."
+                    f"Cross-loading detected: items from multiple constructs load on {f}. "
+                    "This is a data quality issue. Consider: "
+                    "(1) removing weak items in CFA Refine panel, "
+                    "(2) using 'Keep Data Input Structure' in Step 7."
                 )
-                default_name = f
-            elif len(unique_cons) == 1:
-                st.success(f"**{f}** — items predominantly from **{unique_cons[0]}**.")
-                default_name = unique_cons[0]
-            else:
-                default_name = f
-
-            options = [f] + [c for c in construct_names if c != f] + ["[ Custom... ]"]
-            saved   = st.session_state.get(f"efa_fname_{f}", default_name)
-            try:
-                def_idx = options.index(saved)
-            except ValueError:
-                def_idx = 0
-
-            selected = st.selectbox(
-                f"Name for {f}:",
-                options=options,
-                index=def_idx,
-                key=f"efa_fname_{f}",
-                help=(
-                    f"Keep as '{f}' if cross-loading is detected. "
-                    "Use a construct name only if items clearly belong to that construct."
-                )
-            )
-            if selected == "[ Custom... ]":
-                prev   = saved if saved not in options else ""
-                custom = st.text_input(f"Custom name for {f}:", value=prev,
-                                       key=f"efa_custom_{f}")
-                name   = custom.strip() if custom.strip() else f
-            else:
-                name = selected
-
-        with c2:
-            st.markdown(f"**Top items on {f}:**")
-            for item in top_items:
-                lam   = loadings_mat.loc[item, f]
-                cname = item_to_construct.get(item, "?")
-                flag  = "✅" if abs(lam) >= 0.50 else "⚠️"
-                st.markdown(f"  - {flag} {item} [{cname}] λ = {lam:.3f}")
-
-        factor_names[f] = name
-
-    # Warnings
-    if has_cross_loading:
-        badge("warning",
-            "Cross-loading detected in one or more factors. "
-            "This suggests items are not measuring distinct constructs. "
-            "Consider: (1) removing cross-loading items in the CFA Refine panel, "
-            "(2) using 'Keep Data Input Structure' instead of EFA structure."
-        )
-
-    values = list(factor_names.values())
-    if len(set(values)) < len(values):
-        badge("warning",
-            "Duplicate factor names detected. Each factor must have a unique name. "
-            "If two factors seem to measure the same construct, reduce the number of factors."
-        )
-    else:
-        badge("ok", "Factor names assigned. Review the summary below before proceeding to CFA.")
 
     st.session_state["efa_factor_names"] = factor_names
     return factor_names
@@ -784,4 +739,51 @@ def render_efa():
 
     st.session_state["efa_complete"] = True
     st.markdown("---")
-    badge("excellent", "EFA complete. Proceed to Confirmatory Factor Analysis (CFA).")
+
+    NL = chr(10)
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("✅ Use EFA-selected Items → CFA", type="primary",
+                     key="efa_to_cfa_final", use_container_width=True):
+            efa_constructs = st.session_state.get("efa_suggested_constructs", {})
+            original       = st.session_state.get("constructs", {})
+            if not efa_constructs:
+                efa_constructs = original
+            errors = [c for c, v in efa_constructs.items() if len(v) < 3]
+            if errors:
+                badge("warning",
+                    f"Constructs with < 3 items: {', '.join(errors)}. "
+                    "Add items in Step 7 or use 'Keep Data Input Structure'.")
+            else:
+                st.session_state["constructs"] = efa_constructs
+                cfa_lines = [f"{c} =~ {' + '.join(items)}"
+                             for c, items in efa_constructs.items() if items]
+                st.session_state["cfa_syntax"] = NL.join(cfa_lines)
+                sem_lines = cfa_lines[:]
+                for pred, out in st.session_state.get("structural_paths", []):
+                    sem_lines.append(f"{out} ~ {pred}")
+                st.session_state["sem_syntax"] = NL.join(sem_lines)
+                import json as _json
+                cfg = {
+                    "constructs":       {k: list(v) for k, v in efa_constructs.items()},
+                    "structural_paths": [list(p) for p in st.session_state.get("structural_paths", [])],
+                    "cfa_syntax":       st.session_state["cfa_syntax"],
+                    "sem_syntax":       st.session_state["sem_syntax"],
+                }
+                st.session_state["_model_config_json"] = _json.dumps(cfg)
+                st.session_state["current_page"] = "cfa"
+                st.rerun()
+    with col2:
+        if st.button("📋 Keep Data Input Structure → CFA", type="secondary",
+                     key="efa_keep_final", use_container_width=True):
+            original  = st.session_state.get("constructs", {})
+            cfa_lines = [f"{c} =~ {' + '.join(items)}"
+                         for c, items in original.items() if items]
+            st.session_state["cfa_syntax"] = NL.join(cfa_lines)
+            sem_lines = cfa_lines[:]
+            for pred, out in st.session_state.get("structural_paths", []):
+                sem_lines.append(f"{out} ~ {pred}")
+            st.session_state["sem_syntax"] = NL.join(sem_lines)
+            st.session_state["current_page"] = "cfa"
+            st.rerun()
+    badge("ok", "EFA complete. Choose an option above to proceed to CFA.")
