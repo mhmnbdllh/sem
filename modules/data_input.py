@@ -218,9 +218,21 @@ def render_construct_definition(df, assignments):
         _cname_key = f"construct_name_{i}"
         if _cname_key not in st.session_state:
             st.session_state[_cname_key] = default_name
-        name = st.text_input(f"Construct {i+1} name", key=_cname_key)
+        name = st.text_input(
+            f"Construct {i+1} name",
+            key=_cname_key,
+            help="Use your theoretical construct name (e.g., UIUX, Motivation, SelfEfficacy). "
+                 "Must match exactly throughout the analysis."
+        )
+        if not name.strip():
+            st.warning(f"Please enter a name for Construct {i+1}.")
         with c2:
-            selected = st.multiselect(f"Indicators for {name}", options=indicator_cols, key=f"construct_items_{i}")
+            selected = st.multiselect(
+                f"Indicators for {name if name.strip() else f'Construct {i+1}'}",
+                options=indicator_cols,
+                key=f"construct_items_{i}",
+                help="Select items that measure this construct. Minimum 3 items required."
+            )
         if name and selected:
             constructs[name] = selected
             if len(selected) < 3:
