@@ -729,16 +729,17 @@ def render_cfa():
     df         = st.session_state["df"]
     constructs = st.session_state.get("constructs", {})
 
-    # Validate construct names vs dataset columns
+    # Validate items (indicators) exist in dataset
     if constructs and df is not None:
         all_items = [item for items in constructs.values() for item in items]
         missing   = [i for i in all_items if i not in df.columns]
         if missing:
             st.error(
-                f"**Item mismatch detected:** {', '.join(missing[:10])} "
-                f"not found in dataset. "
-                "Go to Data Input and ensure item names match your dataset column names exactly. "
-                "Check for typos, spaces, or capitalization differences."
+                f"**Item mismatch:** {', '.join(missing[:10])} "
+                f"not found in your dataset. "
+                "This usually happens when construct names were accidentally used as item names. "
+                "Go to **Data Input → Step 3** and ensure each construct's items are "
+                "the actual column names from your CSV/Excel file (e.g., uiux_1, pm_2, pe_3)."
             )
             return
 
@@ -901,13 +902,12 @@ def render_cfa():
             # Reset to original button
             col_reset, col_save = st.columns([1, 2])
             with col_reset:
-                if st.button("↩ Reset to Original Items", key="cfa_reset_items_btn",
-                             type="secondary", use_container_width=True):
+                if st.button("↩ Restore All Original Items", key="cfa_reset_items_btn",
+                             type="secondary", use_container_width=True,
+                             help="Restore all items from Data Input for all constructs"):
                     for cname in constructs:
-                        orig = original_constructs.get(cname, constructs[cname])
-                        key = f"cfa_edit_{cname}"
-                        if key in st.session_state:
-                            del st.session_state[key]
+                        orig_items = original_constructs.get(cname, constructs.get(cname, []))
+                        st.session_state[f"cfa_edit_{cname}"] = orig_items
                     st.rerun()
 
             with col_save:
