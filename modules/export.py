@@ -563,7 +563,7 @@ def generate_html_report():
         s5 += _html_badge(level,
             f"Overall CFA fit{n_str}: CFI = {cfi_val:.3f} ({cfi_desc}), "
             f"RMSEA = {rmsea_val:.3f} ({rmsea_desc}), "
-            f"SRMR = {srmr_val:.3f if srmr_val else '—'}. "
+            f"SRMR = {(f"{srmr_val:.3f}" if srmr_val is not None else "—")}. "
             f"{'The measurement model demonstrates adequate fit to the data.' if fit_overall else 'The measurement model fit is below acceptable thresholds — consider removing weak items or re-specifying the model.'} "
             "Evaluate multiple fit indices jointly (Hu & Bentler, 1999)."
         )
@@ -1128,7 +1128,7 @@ def generate_html_report():
                     narratives.append(
                         f"H{i} ({p.get('predictor','?')} → {p.get('outcome','?')}): "
                         f"β = {beta:.3f}, {'supported' if supp else 'not supported'} "
-                        f"(p = {p_val:.4f if p_val else '—'}). Effect is {direction} and {strength}."
+                        f"(p = {(f"{p_val:.4f}" if p_val is not None else "—")}). Effect is {direction} and {strength}."
                     )
             if narratives:
                 s_pls += "<ul>" + "".join(f"<li>{n}</li>" for n in narratives) + "</ul>"
@@ -1298,6 +1298,22 @@ def generate_html_report():
 
 def render_html_export():
     st.subheader("Export HTML Report")
+    has_pls   = bool(st.session_state.get("pls_complete") and
+                     st.session_state.get("pls_result") and
+                     not st.session_state.get("pls_result", {}).get("error"))
+    has_cbsem = bool(st.session_state.get("sem_complete") or
+                     st.session_state.get("cfa_complete"))
+    if has_pls and has_cbsem:
+        st.info(
+            "Both **CB-SEM (lavaan)** and **PLS-SEM** results detected. "
+            "The report will include both as separate sections."
+        )
+    elif has_pls:
+        st.info("**PLS-SEM** results will be included in the report.")
+    elif has_cbsem:
+        st.info("**CB-SEM** results will be included in the report.")
+    else:
+        st.warning("No analysis results found. Run CFA/SEM or PLS-SEM first.")
     st.markdown(
         "Download a complete, publication-ready HTML report containing all results, "
         "interpretations, path diagram, and APA narrative. "
@@ -1334,110 +1350,121 @@ def render_html_export():
 
 def render_text_export():
     st.subheader("Quick Text Summary")
-    st.markdown("All key statistics in one place — copy and paste into your notes.")
     ss = st.session_state
+    has_cbsem = bool(ss.get('sem_complete') or ss.get('cfa_complete'))
+    has_pls   = bool(ss.get('pls_complete') and ss.get('pls_result'))
+
+    if has_cbsem and has_pls:
+        tab1, tab2 = st.tabs(["CB-SEM (lavaan)", "PLS-SEM"])
+        with tab1:
+            _render_cbsem_text(ss)
+        with tab2:
+            _render_plssem_text(ss)
+    elif has_pls:
+        st.markdown("**PLS-SEM Results:**")
+        _render_plssem_text(ss)
+    else:
+        st.markdown("**CB-SEM Results:**")
+        _render_cbsem_text(ss)
+
+
+def _render_cbsem_text(ss):
     lines = []
-
-    # CFA Fit
-    cfa_fit = ss.get("cfa_fit", {})
+    cfa_fit = ss.get('cfa_fit', {})
     if cfa_fit:
-        chi2 = _safe_float(cfa_fit.get("chi2"))
-        df_  = _safe_float(cfa_fit.get("df"))
-        p_   = _safe_float(cfa_fit.get("pvalue"))
-        lines.append("CFA FIT INDICES:")
-        if chi2 and df_: lines.append(f"  chi2({int(df_)}) = {chi2:.3f}, p = {_fmt(p_,3)}")
-        if chi2 and df_ and df_ > 0: lines.append(f"  chi2/df = {chi2/df_:.3f}")
-        for k,label in [("rmsea","RMSEA"),("cfi","CFI"),("tli","TLI"),("srmr","SRMR"),("gfi","GFI"),("nfi","NFI"),("aic","AIC"),("bic","BIC")]:
+        chi2 = _safe_float(cfa_fit.get('chi2'))
+        df_  = _safe_float(cfa_fit.get('df'))
+        p_   = _safe_float(cfa_fit.get('pvalue'))
+        lines.append('CB-SEM (lavaan) CFA FIT INDICES:')
+        if chi2 and df_:
+            lines.append(f'  chi2({int(df_)}) = {chi2:.3f}, p = {_fmt(p_,3)}')
+            if df_ > 0:
+                lines.append(f'  chi2/df = {chi2/df_:.3f}')
+        for k, label in [('rmsea','RMSEA'),('cfi','CFI'),('tli','TLI'),('srmr','SRMR'),('aic','AIC'),('bic','BIC')]:
             v = _safe_float(cfa_fit.get(k))
-            if v is not None: lines.append(f"  {label} = {v:.3f}")
-
-    # SEM Fit
-    sem_fit = ss.get("sem_fit", {})
-    if sem_fit:
-        chi2 = _safe_float(sem_fit.get("chi2"))
-        df_  = _safe_float(sem_fit.get("df"))
-        p_   = _safe_float(sem_fit.get("pvalue"))
-        lines.append("\nSEM FIT INDICES:")
-        if chi2 and df_: lines.append(f"  chi2({int(df_)}) = {chi2:.3f}, p = {_fmt(p_,3)}")
-        if chi2 and df_ and df_ > 0: lines.append(f"  chi2/df = {chi2/df_:.3f}")
-        for k,label in [("rmsea","RMSEA"),("cfi","CFI"),("tli","TLI"),("srmr","SRMR"),("aic","AIC"),("bic","BIC")]:
-            v = _safe_float(sem_fit.get(k))
-            if v is not None: lines.append(f"  {label} = {v:.3f}")
-
-    # Reliability
-    metrics = ss.get("cfa_metrics", {})
-    if metrics:
-        lines.append("\nRELIABILITY AND VALIDITY:")
-        for cname, m in metrics.items():
-            alpha = _safe_float(m.get("alpha"))
-            cr    = _safe_float(m.get("cr"))
-            ave   = _safe_float(m.get("ave"))
-            lines.append(f"  {cname}: alpha={_fmt(alpha)}, CR={_fmt(cr)}, AVE={_fmt(ave)}")
-
-    # Structural Paths
-    sem_paths = ss.get("sem_paths", [])
+            if v is not None: lines.append(f'  {label} = {v:.3f}')
+    sem_paths = ss.get('sem_paths', [])
     if sem_paths:
-        lines.append("\nSTRUCTURAL PATHS:")
-        for i, p in enumerate(sem_paths):
-            beta  = _safe_float(p.get("beta"))
-            se    = _safe_float(p.get("se"))
-            z     = _safe_float(p.get("z"))
-            p_val = _safe_float(p.get("p"))
+        lines.append('')
+        lines.append('STRUCTURAL PATHS:')
+        for i, p in enumerate(sem_paths, 1):
+            beta  = _safe_float(p.get('beta'))
+            p_val = _safe_float(p.get('p'))
+            se    = _safe_float(p.get('se'))
+            z     = _safe_float(p.get('z'))
             if beta is not None:
-                lines.append(
-                    f"  H{i+1}: {p.get('predictor','?')} -> {p.get('outcome','?')}: "
-                    f"beta={beta:.3f}{_stars(p_val)}, SE={_fmt(se)}, z={_fmt(z)}, p={_fmt(p_val,4)}"
-                )
-
-    # R2
-    sem_r2 = ss.get("sem_r2", [])
+                lines.append(f'  H{i}: {p.get("predictor","?")} -> {p.get("outcome","?")}: beta={beta:.3f}{_stars(p_val)}, SE={_fmt(se)}, z={_fmt(z)}, p={_fmt(p_val,4)}')
+    metrics = ss.get('cfa_metrics', {})
+    if metrics:
+        lines.append('')
+        lines.append('RELIABILITY AND VALIDITY:')
+        for cname, m in metrics.items():
+            lines.append(f'  {cname}: alpha={_fmt(_safe_float(m.get("alpha")))}, CR={_fmt(_safe_float(m.get("cr")))}, AVE={_fmt(_safe_float(m.get("ave")))}')
+    sem_r2 = ss.get('sem_r2', [])
     if sem_r2:
-        lines.append("\nEXPLAINED VARIANCE (R2):")
+        lines.append('')
+        lines.append('EXPLAINED VARIANCE (R2):')
         for row in sem_r2:
             if isinstance(row, dict):
-                r2 = _safe_float(row.get("R2"))
-                if r2 is not None:
-                    lines.append(f"  {row.get('Construct','?')}: R2 = {r2:.3f} ({r2:.1%})")
-
-    # Mediation
-    med = ss.get("mediation_results", {})
-    med_vars = ss.get("mediation_vars", {})
+                r2 = _safe_float(row.get('R2'))
+                if r2 is not None: lines.append(f'  {row.get("Construct","?")}: R2 = {r2:.3f} ({r2:.1%})')
+    med = ss.get('mediation_results', {})
+    med_vars = ss.get('mediation_vars', {})
     if med and isinstance(med, dict):
-        x = med_vars.get("x","X"); m_v = med_vars.get("m","M"); y = med_vars.get("y","Y")
-        lines.append(f"\nMEDIATION ({x} -> {m_v} -> {y}):")
-        for key, label in [("a_path","a path"),("b_path","b path"),("cp_path","c' direct"),("total","c total"),("indirect","Indirect")]:
+        x = med_vars.get('x','X'); m_v = med_vars.get('m','M'); y = med_vars.get('y','Y')
+        lines.append('')
+        lines.append(f'MEDIATION ({x} -> {m_v} -> {y}):')
+        for key, label in [('indirect','Indirect'),('cp_path','c\' direct'),('total','Total')]:
             d = med.get(key, {})
             if isinstance(d, dict):
-                est   = _safe_float(d.get("est"))
-                ci_lo = _safe_float(d.get("ci_lo"))
-                ci_hi = _safe_float(d.get("ci_hi"))
-                p_val = _safe_float(d.get("p"))
+                est   = _safe_float(d.get('est'))
+                ci_lo = _safe_float(d.get('ci_lo'))
+                ci_hi = _safe_float(d.get('ci_hi'))
+                p_val = _safe_float(d.get('p'))
                 if est is not None:
-                    ci_str = f", 95% CI [{_fmt(ci_lo,4)}, {_fmt(ci_hi,4)}]" if ci_lo is not None else ""
-                    p_str  = f", p={_fmt(p_val,4)}" if p_val is not None else ""
-                    lines.append(f"  {label}: beta={est:.4f}{_stars(p_val)}{ci_str}{p_str}")
-        med_type = ss.get("mediation_type", "")
-        vaf      = ss.get("mediation_vaf")
-        if med_type: lines.append(f"  Type: {med_type}")
-        if vaf:      lines.append(f"  VAF = {vaf:.1%}")
+                    ci_str = f', 95% CI [{_fmt(ci_lo,4)}, {_fmt(ci_hi,4)}]' if ci_lo is not None else ''
+                    lines.append(f'  {label}: beta={est:.4f}{_stars(p_val)}{ci_str}')
+    text = chr(10).join(lines) if lines else 'No CB-SEM results yet. Run CFA and SEM first.'
+    st.text_area('CB-SEM Summary', value=text, height=400, key='cbsem_text_area')
 
-    # Moderation
-    mod = ss.get("moderation_results", {})
-    mod_vars = ss.get("moderation_vars", {})
-    if mod and isinstance(mod, dict):
-        x = mod_vars.get("x","X"); w = mod_vars.get("w","W"); y = mod_vars.get("y","Y")
-        b3   = _safe_float(mod.get("b3"))
-        b3_p = _safe_float(mod.get("b3_p"))
-        dr2  = _safe_float(mod.get("delta_r2"))
-        f2   = _safe_float(mod.get("f2_interaction"))
-        lines.append(f"\nMODERATION ({x} x {w} -> {y}):")
-        if b3   is not None: lines.append(f"  Interaction beta = {b3:.4f}{_stars(b3_p)}, p = {_fmt(b3_p,4)}")
-        if dr2  is not None: lines.append(f"  Delta R2 = {dr2:.4f}")
-        if f2   is not None: lines.append(f"  f2 (interaction) = {f2:.4f}")
 
-    text = "\n".join(lines) if lines else "No results yet. Run analyses first."
-    st.text_area("Results Summary", value=text, height=400, key="text_export_area")
-
+def _render_plssem_text(ss):
+    pls = ss.get('pls_result', {})
+    if not pls or pls.get('error'):
+        st.info('No PLS-SEM results yet. Run PLS-SEM first.')
+        return
+    lines = [f'PLS-SEM ({pls.get("method","Composite-based PLS")})', f'n = {pls.get("n","?")}, Bootstrap = {pls.get("n_boot",1000)} resamples']
+    fit = pls.get('fit', {})
+    srmr = _safe_float(fit.get('srmr'))
+    if srmr is not None: lines.append(f'SRMR = {srmr:.3f} ({"< .080 OK" if srmr < 0.08 else "> .080 Poor"})')
+    rel = pls.get('reliability', {})
+    if rel:
+        lines.append('')
+        lines.append('RELIABILITY AND VALIDITY (PLS):')
+        for cname, m in rel.items():
+            lines.append(f'  {cname}: alpha={_fmt(_safe_float(m.get("alpha")))}, rho_c={_fmt(_safe_float(m.get("cr")))}, AVE={_fmt(_safe_float(m.get("ave")))}')
+    paths = pls.get('paths', [])
+    if paths:
+        lines.append('')
+        lines.append('STRUCTURAL PATHS (bootstrapped):')
+        for i, p in enumerate(paths, 1):
+            beta  = _safe_float(p.get('beta'))
+            t_val = _safe_float(p.get('t_stat'))
+            p_val = _safe_float(p.get('p_value'))
+            ci_lo = _safe_float(p.get('ci_lo'))
+            ci_hi = _safe_float(p.get('ci_hi'))
+            if beta is not None:
+                ci_str = f', 95% CI [{ci_lo:.3f}, {ci_hi:.3f}]' if ci_lo is not None and ci_hi is not None else ''
+                lines.append(f'  H{i}: {p.get("predictor","?")} -> {p.get("outcome","?")}: beta={beta:.3f}{_stars(p_val)}, t={_fmt(t_val,3)}, p={_fmt(p_val,4)}{ci_str}')
+    r2_list = pls.get('r2', [])
+    if r2_list:
+        lines.append('')
+        lines.append('EXPLAINED VARIANCE (R2):')
+        for r in r2_list:
+            r2v = _safe_float(r.get('r2'))
+            if r2v is not None: lines.append(f'  {r.get("construct","?")}: R2 = {r2v:.3f} ({r2v:.1%}) — {r.get("level","")}')
+    text = chr(10).join(lines)
+    st.text_area('PLS-SEM Summary', value=text, height=400, key='plssem_text_area')
 
 def render_export():
     st.title("Export Report")
