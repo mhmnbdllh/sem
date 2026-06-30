@@ -450,8 +450,33 @@ def render_home():
 
     st.markdown("---")
 
+    # Explicit method choice — shown prominently BEFORE the sidebar order
+    # implies any sequence. Sidebar position (CB-SEM listed above PLS-SEM)
+    # is purely alphabetical/visual and does NOT mean PLS-SEM comes "after".
+    if not st.session_state.get("df_ready"):
+        st.subheader("Choose Your Method First")
+        st.markdown(
+            "**CB-SEM and PLS-SEM are two independent methods.** "
+            "Their position in the sidebar does not imply an order — "
+            "pick the one that fits your research goal."
+        )
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.info(
+                "**CB-SEM (lavaan)**\n\n"
+                "Theory confirmation, n ≥ 100, reflective constructs only.\n\n"
+                "Path: Data Input → Descriptive → EFA *(optional)* → CFA → SEM"
+            )
+        with col_b:
+            st.info(
+                "**PLS-SEM**\n\n"
+                "Prediction focus, small n OK, formative constructs allowed.\n\n"
+                "Path: Data Input → Descriptive → PLS-SEM (skip EFA/CFA/SEM entirely)"
+            )
+        st.markdown("---")
+
     # CB-SEM vs PLS-SEM guide
-    with st.expander("📖 Analysis Flow Guide — CB-SEM vs PLS-SEM", expanded=not st.session_state.get("df_ready")):
+    with st.expander("📖 Analysis Flow Guide — CB-SEM vs PLS-SEM", expanded=False):
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("""
