@@ -435,6 +435,38 @@ def render_home():
 
     st.markdown("---")
 
+    # CB-SEM vs PLS-SEM guide
+    with st.expander("📖 Analysis Flow Guide — CB-SEM vs PLS-SEM", expanded=not st.session_state.get("df_ready")):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("""
+**CB-SEM Flow (lavaan) — Theory Confirmation:**
+1. Data Input
+2. Descriptive Statistics
+3. EFA *(optional)*
+4. CFA
+5. SEM
+6. Mediation / Moderation *(optional)*
+7. Export Report
+
+✅ Use when: testing theory, n ≥ 100, normal-ish data
+            """)
+        with col2:
+            st.markdown("""
+**PLS-SEM Flow — Prediction:**
+1. Data Input
+2. Descriptive Statistics
+3. PLS-SEM *(skip EFA/CFA/SEM)*
+4. Export Report
+
+✅ Use when: prediction focus, small n (≥ 30), non-normal data
+
+⚠️ CB-SEM and PLS-SEM results are **not directly comparable**.
+Quick Text and HTML Report show each method separately.
+            """)
+
+    st.markdown("---")
+
     # Pipeline progress
     st.subheader("Your Analysis Pipeline")
     progress = get_progress()
