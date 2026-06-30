@@ -560,10 +560,11 @@ def generate_html_report():
         fit_overall = (cfi_val >= 0.90 and rmsea_val <= 0.08)
         level = "excellent" if cfi_val >= 0.95 and rmsea_val <= 0.06 else "ok" if fit_overall else "warning"
         n_str = f" (n = {int(n_cfa)})" if n_cfa else ""
+        srmr_str = f"{srmr_val:.3f}" if srmr_val is not None else "—"
         s5 += _html_badge(level,
             f"Overall CFA fit{n_str}: CFI = {cfi_val:.3f} ({cfi_desc}), "
             f"RMSEA = {rmsea_val:.3f} ({rmsea_desc}), "
-            f"SRMR = {(f"{srmr_val:.3f}" if srmr_val is not None else "—")}. "
+            f"SRMR = {srmr_str}. "
             f"{'The measurement model demonstrates adequate fit to the data.' if fit_overall else 'The measurement model fit is below acceptable thresholds — consider removing weak items or re-specifying the model.'} "
             "Evaluate multiple fit indices jointly (Hu & Bentler, 1999)."
         )
@@ -1125,10 +1126,11 @@ def generate_html_report():
                 if beta is not None:
                     direction = "positive" if beta > 0 else "negative"
                     strength  = "strong" if abs(beta) >= 0.50 else "moderate" if abs(beta) >= 0.30 else "weak"
+                    p_str = f"{p_val:.4f}" if p_val is not None else "—"
                     narratives.append(
                         f"H{i} ({p.get('predictor','?')} → {p.get('outcome','?')}): "
                         f"β = {beta:.3f}, {'supported' if supp else 'not supported'} "
-                        f"(p = {(f"{p_val:.4f}" if p_val is not None else "—")}). Effect is {direction} and {strength}."
+                        f"(p = {p_str}). Effect is {direction} and {strength}."
                     )
             if narratives:
                 s_pls += "<ul>" + "".join(f"<li>{n}</li>" for n in narratives) + "</ul>"
