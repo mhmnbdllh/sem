@@ -322,7 +322,7 @@ def run_plssem(df: pd.DataFrame,
                construct_types: dict = None,
                n_boot: int = 1000) -> dict:
     """
-    Run PLS-SEM via seminr package.
+    Run PLS-SEM via the NIPALS algorithm (base R, no external package dependency).
     
     Parameters
     ----------
