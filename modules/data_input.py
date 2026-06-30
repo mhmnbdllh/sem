@@ -401,6 +401,34 @@ def render_data_input():
 
     if constructs:
         if st.button("Confirm Model Setup and Proceed", type="primary", use_container_width=True, key="confirm_setup_btn"):
+            # Detect if constructs/paths actually CHANGED from what was previously confirmed.
+            # If so, all downstream analysis results are now stale and must be cleared —
+            # otherwise CFA/SEM/PLS-SEM pages would keep showing results computed from
+            # the OLD model structure, silently mismatched with the new one.
+            prev_constructs = st.session_state.get("constructs")
+            prev_paths      = st.session_state.get("structural_paths")
+            changed = (prev_constructs != constructs) or (prev_paths != paths)
+
+            if changed and (prev_constructs is not None or prev_paths is not None):
+                stale_keys = [
+                    # CB-SEM results
+                    "efa_complete", "efa_result", "efa_factor_names", "efa_suggested_constructs",
+                    "cfa_complete", "cfa_result", "cfa_fit", "cfa_loadings", "cfa_metrics",
+                    "sem_complete", "sem_result", "sem_fit", "sem_paths", "sem_r2",
+                    "mediation_results", "mediation_vars",
+                    "moderation_results", "moderation_vars",
+                    "invariance_results", "comparison_results",
+                    # PLS-SEM results
+                    "pls_complete", "pls_result",
+                ]
+                for k in stale_keys:
+                    st.session_state.pop(k, None)
+                badge("warning",
+                    "Model structure changed — all previous analysis results "
+                    "(EFA, CFA, SEM, PLS-SEM, and downstream reports) have been cleared. "
+                    "You must re-run each analysis with the updated model."
+                )
+
             st.session_state["df"]         = df
             st.session_state["df_ready"]   = True
             st.session_state["validation"] = validation
