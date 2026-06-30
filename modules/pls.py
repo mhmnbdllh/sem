@@ -334,16 +334,22 @@ def render_inner_model(result):
         )
 
     # VIF
+    # NOTE: R structure is vif[outcome][predictor] = value
+    # (R groups VIF by outcome construct, since multicollinearity is assessed
+    #  among predictors of the SAME outcome)
     vif = result.get("vif")
     if vif:
         st.markdown("**VIF (Variance Inflation Factor) — Inner Model Collinearity:**")
+        st.caption(
+            "VIF measures multicollinearity among predictors of the same outcome construct."
+        )
         vif_rows = []
-        for pred, vif_vals in vif.items():
+        for outcome, vif_vals in vif.items():
             if isinstance(vif_vals, dict):
-                for out, v in vif_vals.items():
-                    vif_rows.append({"Predictor": pred, "Outcome": out, "VIF": _fmt(v, 3)})
+                for predictor, v in vif_vals.items():
+                    vif_rows.append({"Predictor": predictor, "Outcome": outcome, "VIF": _fmt(v, 3)})
             elif isinstance(vif_vals, (int, float)):
-                vif_rows.append({"Predictor": pred, "VIF": _fmt(vif_vals, 3)})
+                vif_rows.append({"Predictor": "?", "Outcome": outcome, "VIF": _fmt(vif_vals, 3)})
         if vif_rows:
             st.dataframe(pd.DataFrame(vif_rows), use_container_width=True, hide_index=True)
             st.caption("VIF < 5.0 = no collinearity concern (Hair et al., 2022). VIF < 3.3 = ideal.")
@@ -461,8 +467,14 @@ def render_fit(result):
 # ─────────────────────────────────────────────────────────────────────────────
 def render_pls():
     st.title("PLS-SEM Analysis")
+    st.warning(
+        "⚠️ **You are now in the PLS-SEM track.** "
+        "This is a separate analytical method from CB-SEM (EFA/CFA/SEM with lavaan). "
+        "You do **not** need to complete EFA, CFA, or SEM before running PLS-SEM. "
+        "Only **Data Input** and **Descriptive Statistics** are required first."
+    )
     st.markdown(
-        "**Partial Least Squares Structural Equation Modeling** via R. "
+        "**Partial Least Squares Structural Equation Modeling** via R (composite-based). "
         "PLS-SEM is suitable for prediction-oriented research, non-normal data, "
         "and smaller sample sizes."
     )
