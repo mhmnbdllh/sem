@@ -292,10 +292,57 @@ def build_path_diagram(constructs, structural_paths,
     return fig
 
 
+def _pls_paths_to_sem_format(pls_paths):
+    """Convert PLS-SEM path dicts (t_stat/p_value) to the format build_path_diagram expects (se/p)."""
+    converted = []
+    for p in pls_paths:
+        converted.append({
+            "predictor": p.get("predictor"),
+            "outcome":   p.get("outcome"),
+            "beta":      p.get("beta"),
+            "se":        None,
+            "p":         p.get("p_value"),
+        })
+    return converted
+
+
+def _pls_loadings_to_cfa_format(pls_loadings):
+    """Convert PLS-SEM loadings list to the {construct: {item: lambda}} dict build_path_diagram expects."""
+    out = {}
+    for l in pls_loadings:
+        cname = l.get("construct")
+        item  = l.get("item")
+        lam   = l.get("loading")
+        if cname and item:
+            out.setdefault(cname, {})[item] = lam
+    return out
+
+
 def render_path_diagram():
-    st.subheader("SEM Path Diagram")
+    ss = st.session_state
+    has_pls   = bool(ss.get("pls_complete") and ss.get("pls_result") and not ss.get("pls_result", {}).get("error"))
+    has_cbsem = bool(ss.get("sem_complete") or ss.get("cfa_complete"))
+
+    if has_pls and has_cbsem:
+        tab1, tab2 = st.tabs(["CB-SEM Diagram", "PLS-SEM Diagram"])
+        with tab1:
+            _render_cbsem_path_diagram()
+        with tab2:
+            _render_plssem_path_diagram()
+    elif has_pls:
+        st.info("Showing **PLS-SEM** path diagram (no CB-SEM analysis detected).")
+        _render_plssem_path_diagram()
+    elif has_cbsem:
+        st.info("Showing **CB-SEM** path diagram.")
+        _render_cbsem_path_diagram()
+    else:
+        st.warning("Run CFA/SEM or PLS-SEM first to see a path diagram.")
+
+
+def _render_cbsem_path_diagram():
+    st.subheader("CB-SEM Path Diagram (lavaan)")
     st.markdown(
-        "Interactive path diagram of your complete SEM model. "
+        "Interactive path diagram of your CB-SEM model. "
         "**Oval nodes** = latent constructs. **Square nodes** = observed indicators. "
         "**Green** = significant positive path. **Red** = significant negative. "
         "**Gray dashed** = non-significant."
@@ -310,20 +357,22 @@ def render_path_diagram():
     if not constructs:
         st.warning("No constructs defined. Complete Data Input first.")
         return
+    if not sem_paths:
+        st.info("Run SEM first to see structural path results in the diagram.")
 
     c1, c2, c3 = st.columns(3)
     with c1:
-        show_loadings   = st.checkbox("Show factor loadings", value=True, key="diag_loadings")
+        show_loadings   = st.checkbox("Show factor loadings", value=True, key="diag_loadings_cb")
     with c2:
-        show_r2         = st.checkbox("Show R2 values", value=True, key="diag_r2")
+        show_r2         = st.checkbox("Show R2 values", value=True, key="diag_r2_cb")
     with c3:
-        show_indicators = st.checkbox("Show indicators", value=True, key="diag_indicators")
+        show_indicators = st.checkbox("Show indicators", value=True, key="diag_indicators_cb")
 
     fig = build_path_diagram(
         constructs       = constructs,
         structural_paths = structural_paths,
         sem_paths        = sem_paths,
-        cfa_loadings     = cfa_loadings if show_loadings else {},
+        cfa_loadings      = cfa_loadings if show_loadings else {},
         r2_data          = r2_data_all if show_r2 else [],
         show_indicators  = show_indicators,
     )
@@ -338,10 +387,66 @@ def render_path_diagram():
         '</div>',
         unsafe_allow_html=True,
     )
-    st.caption("Note: Path labels show standardized beta. * p < .05; ** p < .01; *** p < .001; ns = not significant.")
-    badge("ok",
-        "Tip: Hover over nodes and arrows for details. "
-        "Use the camera icon in the top-right to save as PNG."
+    st.caption("Note: Path labels show standardized beta from lavaan/SEM. * p < .05; ** p < .01; *** p < .001; ns = not significant.")
+
+
+def _render_plssem_path_diagram():
+    st.subheader("PLS-SEM Path Diagram (NIPALS)")
+    st.markdown(
+        "Interactive path diagram of your PLS-SEM model. "
+        "**Oval nodes** = composite constructs (NIPALS-estimated). "
+        "**Square nodes** = observed indicators. "
+        "**Green** = significant positive path (bootstrap p < .05). "
+        "**Red** = significant negative. **Gray dashed** = non-significant."
+    )
+
+    pls = st.session_state.get("pls_result", {})
+    if not pls or pls.get("error"):
+        st.warning("Run PLS-SEM first to see the path diagram.")
+        return
+
+    constructs       = st.session_state.get("constructs", {})
+    structural_paths = st.session_state.get("structural_paths", [])
+    pls_paths_raw    = pls.get("paths", [])
+    pls_loadings_raw = pls.get("loadings", [])
+    pls_r2_raw       = pls.get("r2", [])
+
+    sem_paths_fmt    = _pls_paths_to_sem_format(pls_paths_raw)
+    cfa_loadings_fmt = _pls_loadings_to_cfa_format(pls_loadings_raw)
+    # PLS r2 uses key "construct" not "Construct" — normalize
+    r2_data_fmt = [{"Construct": r.get("construct"), "R2": r.get("r2")} for r in pls_r2_raw]
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        show_loadings   = st.checkbox("Show outer loadings/weights", value=True, key="diag_loadings_pls")
+    with c2:
+        show_r2         = st.checkbox("Show R2 values", value=True, key="diag_r2_pls")
+    with c3:
+        show_indicators = st.checkbox("Show indicators", value=True, key="diag_indicators_pls")
+
+    fig = build_path_diagram(
+        constructs       = constructs,
+        structural_paths = structural_paths,
+        sem_paths        = sem_paths_fmt,
+        cfa_loadings     = cfa_loadings_fmt if show_loadings else {},
+        r2_data          = r2_data_fmt if show_r2 else [],
+        show_indicators  = show_indicators,
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown(
+        '<div style="font-size:0.82rem;color:#555;padding:4px 0">'
+        'Green solid = significant positive | '
+        'Red solid = significant negative | '
+        'Gray dashed = non-significant | '
+        'Dotted = measurement path'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        "Note: Path labels show NIPALS-estimated standardized coefficients. "
+        "Significance via bootstrap (p < .05; *** p < .001). "
+        "Outer loadings are item-composite correlations (Mode A) or regression weights (Mode B)."
     )
 
 
