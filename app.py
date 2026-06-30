@@ -131,24 +131,23 @@ section[data-testid="stSidebar"] .stButton > button:hover {
 
 # ── Navigation ───────────────────────────────────────────────────
 PAGES = {
-    "🏠 Home":                         "home",
-    "── SPRINT 1 ──":                  "divider",
-    "📂 Data Input and Setup":         "data_input",
-    "📊 Descriptive Statistics":       "descriptive",
-    "── SPRINT 2 ──":                  "divider",
-    "🔍 Exploratory Factor Analysis":  "efa",
-    "📐 Confirmatory Factor Analysis": "cfa",
-    "── SPRINT 3 ──":                  "divider",
-    "🔗 Structural Model (SEM)":       "sem",
-    "🔄 Mediation Analysis":           "mediation",
-    "⚖️ Moderation Analysis":          "moderation",
-    "── SPRINT 4 ──":                  "divider",
-    "👥 Measurement Invariance":       "invariance",
-    "📑 Model Comparison":             "model_comparison",
-    "── SPRINT 5 ──":                  "divider",
-    "🗺️ Path Diagram and Visuals":     "visualization",
-    "🔬 PLS-SEM":                      "pls",
-    "📤 Export Report":                "export",
+    "🏠 Home":                          "home",
+    "── SETUP (shared) ──":             "divider",
+    "📂 Data Input and Setup":          "data_input",
+    "📊 Descriptive Statistics":        "descriptive",
+    "── CB-SEM (lavaan) ──":            "divider",
+    "🔍 EFA":                           "efa",
+    "📐 CFA":                           "cfa",
+    "🔗 SEM (Structural Model)":        "sem",
+    "🔄 Mediation Analysis":            "mediation",
+    "⚖️ Moderation Analysis":           "moderation",
+    "👥 Measurement Invariance":        "invariance",
+    "📑 Model Comparison":              "model_comparison",
+    "🗺️ Path Diagram":                  "visualization",
+    "── PLS-SEM (separate method) ──":  "divider",
+    "🔬 PLS-SEM Analysis":              "pls",
+    "── REPORT ──":                     "divider",
+    "📤 Export Report":                 "export",
 }
 
 RENDER = {
@@ -262,28 +261,44 @@ def render_sidebar():
 
         progress = get_progress()
 
-        # Determine next recommended step
-        ordered_steps = ["data_input","descriptive","efa","cfa","sem","mediation","moderation","export"]
+        # Two SEPARATE method tracks. Next-step suggestion only applies
+        # within whichever track the user has already started.
+        # This prevents pointing PLS-SEM users back toward CB-SEM steps.
+        cbsem_track = ["data_input", "descriptive", "efa", "cfa", "sem"]
+        pls_track   = ["data_input", "descriptive", "pls"]
+
+        started_cbsem = any(progress.get(s) for s in ["efa","cfa","sem"])
+        started_pls   = bool(progress.get("pls"))
+
+        if started_pls and not started_cbsem:
+            active_track = pls_track
+        elif started_cbsem and not started_pls:
+            active_track = cbsem_track
+        else:
+            # Neither started, or both started: don't force a direction.
+            # Only suggest the shared setup steps.
+            active_track = ["data_input", "descriptive"]
+
         next_step = None
-        for step in ordered_steps:
+        for step in active_track:
             if not progress.get(step, False):
                 next_step = step
                 break
 
-        # Step labels with numbers for mandatory steps
+        # Step labels reflecting the two separate tracks
         step_labels = {
-            "data_input":       "Step 1",
-            "descriptive":      "Step 2",
-            "efa":              "Step 3 (Optional)",
-            "cfa":              "Step 4",
-            "sem":              "Step 5",
-            "mediation":        "Optional",
-            "moderation":       "Optional",
-            "invariance":       "Optional",
-            "model_comparison": "Optional",
-            "visualization":    "Optional",
-            "pls":              "Optional (PLS-SEM)",
-            "export":           "Final Step",
+            "data_input":       "Setup Step 1 (shared)",
+            "descriptive":      "Setup Step 2 (shared)",
+            "efa":              "CB-SEM — optional",
+            "cfa":              "CB-SEM — required",
+            "sem":              "CB-SEM — required",
+            "mediation":        "CB-SEM — optional",
+            "moderation":       "CB-SEM — optional",
+            "invariance":       "CB-SEM — optional",
+            "model_comparison": "CB-SEM — optional",
+            "visualization":    "CB-SEM — optional",
+            "pls":              "PLS-SEM — separate method",
+            "export":           "Final step (either method)",
         }
 
         for label, key in PAGES.items():
@@ -467,35 +482,67 @@ Quick Text and HTML Report show each method separately.
 
     st.markdown("---")
 
-    # Pipeline progress
+    # Pipeline progress — CB-SEM and PLS-SEM tracked SEPARATELY
+    # These are two distinct statistical methods (lavaan vs composite-based PLS)
+    # and must never be presented as one linear sequence or one combined percentage.
     st.subheader("Your Analysis Pipeline")
     progress = get_progress()
-    keys  = list(RENDER.keys())
-    icons = ["📂","📊","🔍","📐","🔗","🔄","⚖️","👥","📑","🔬","🗺️","📤"]
-    names = ["Data","Desc","EFA","CFA","SEM","Mediation",
-             "Moderation","Invariance","Compare","PLS-SEM","Diagram","Export"]
-    # Ensure icons/names match keys length
-    icons = (icons + ["❓"] * len(keys))[:len(keys)]
-    names = (names + ["?"]  * len(keys))[:len(keys)]
 
-    cols = st.columns(len(keys))
-    for i, key in enumerate(keys):
+    st.markdown("**Shared Setup:**")
+    setup_keys  = ["data_input", "descriptive"]
+    setup_icons = ["📂", "📊"]
+    setup_names = ["Data", "Desc"]
+    cols = st.columns(len(setup_keys))
+    for i, key in enumerate(setup_keys):
         done = progress.get(key, False)
         with cols[i]:
             st.markdown(
                 f'<div style="text-align:center;padding:4px 0">'
-                f'<div style="font-size:1.4rem">{icons[i]}</div>'
-                f'<div style="font-size:0.62rem;color:#1a6fa8;font-weight:700">{names[i]}</div>'
+                f'<div style="font-size:1.4rem">{setup_icons[i]}</div>'
+                f'<div style="font-size:0.62rem;color:#1a6fa8;font-weight:700">{setup_names[i]}</div>'
                 f'<div style="font-size:0.7rem">{"🟢" if done else "⚪"}</div>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
 
-    completed = sum(1 for v in progress.values() if v)
-    total     = len(progress)
-    pct       = completed / total if total > 0 else 0
-    st.progress(pct)
-    st.caption(f"{completed}/{total} steps completed ({pct:.0%})")
+    col_cb, col_pls = st.columns(2)
+
+    with col_cb:
+        st.markdown("**CB-SEM Track (lavaan):**")
+        cb_keys  = ["efa", "cfa", "sem", "mediation", "moderation", "invariance", "model_comparison", "visualization"]
+        cb_icons = ["🔍", "📐", "🔗", "🔄", "⚖️", "👥", "📑", "🗺️"]
+        cb_names = ["EFA", "CFA", "SEM", "Mediation", "Moderation", "Invariance", "Compare", "Diagram"]
+        sub_cols = st.columns(4)
+        for i, key in enumerate(cb_keys):
+            done = progress.get(key, False)
+            with sub_cols[i % 4]:
+                st.markdown(
+                    f'<div style="text-align:center;padding:4px 0">'
+                    f'<div style="font-size:1.2rem">{cb_icons[i]}</div>'
+                    f'<div style="font-size:0.58rem;color:#1a6fa8;font-weight:700">{cb_names[i]}</div>'
+                    f'<div style="font-size:0.65rem">{"🟢" if done else "⚪"}</div>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+        cb_required = ["cfa", "sem"]
+        cb_done = sum(1 for k in cb_required if progress.get(k))
+        st.caption(f"Required steps: {cb_done}/{len(cb_required)} (CFA, SEM)")
+
+    with col_pls:
+        st.markdown("**PLS-SEM Track (separate method):**")
+        done_pls = progress.get("pls", False)
+        st.markdown(
+            f'<div style="text-align:center;padding:20px 0">'
+            f'<div style="font-size:2rem">🔬</div>'
+            f'<div style="font-size:0.8rem;color:#1a6fa8;font-weight:700">PLS-SEM Analysis</div>'
+            f'<div style="font-size:0.9rem">{"🟢 Complete" if done_pls else "⚪ Not started"}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+        st.caption(
+            "PLS-SEM does not require EFA/CFA/SEM. "
+            "Go directly to PLS-SEM in the sidebar if this is your chosen method."
+        )
 
     st.markdown("---")
 
