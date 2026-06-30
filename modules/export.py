@@ -57,7 +57,26 @@ def _stars(p):
 # ── CHECKLIST ────────────────────────────────────────────────────
 
 def render_full_checklist():
-    st.subheader("Methodological Checklist")
+    ss = st.session_state
+    has_pls   = bool(ss.get("pls_complete") and ss.get("pls_result") and not ss.get("pls_result", {}).get("error"))
+    has_cbsem = bool(ss.get("sem_complete") or ss.get("cfa_complete"))
+
+    if has_pls and has_cbsem:
+        tab1, tab2 = st.tabs(["CB-SEM Checklist", "PLS-SEM Checklist"])
+        with tab1:
+            _render_cbsem_checklist()
+        with tab2:
+            _render_plssem_checklist()
+    elif has_pls:
+        st.info("Showing PLS-SEM checklist (no CB-SEM analysis detected).")
+        _render_plssem_checklist()
+    else:
+        st.info("Showing CB-SEM checklist.")
+        _render_cbsem_checklist()
+
+
+def _render_cbsem_checklist():
+    st.subheader("CB-SEM Methodological Checklist")
     ss = st.session_state
     constructs = ss.get("constructs", {})
 
@@ -92,17 +111,72 @@ def render_full_checklist():
             "R2 reported for endogenous constructs": bool(ss.get("sem_r2")),
             "Effect sizes (f2) computed":            bool(ss.get("sem_paths")),
         },
-        "ADVANCED ANALYSES": {
+        "ADVANCED ANALYSES (optional)": {
             "Mediation analysis with bootstrap CI":  bool(ss.get("mediation_results")),
             "Moderation analysis":                   bool(ss.get("moderation_results")),
             "Measurement invariance tested":         bool(ss.get("invariance_results")),
             "Model comparison with rival models":    bool(ss.get("comparison_results")),
         },
     }
+    _render_checklist_tables(checks, required_sections=["DATA PREPARATION","DESCRIPTIVE AND ASSUMPTION TESTING","MEASUREMENT MODEL (CFA)","STRUCTURAL MODEL (SEM)"])
 
+
+def _render_plssem_checklist():
+    st.subheader("PLS-SEM Methodological Checklist")
+    ss  = st.session_state
+    pls = ss.get("pls_result", {})
+    constructs = ss.get("constructs", {})
+    rel = pls.get("reliability", {}) if pls else {}
+
+    def _all_rel(key, thresh):
+        if not rel: return False
+        vals = [m.get(key) for m in rel.values() if m.get(key) is not None]
+        return bool(vals) and all(v >= thresh for v in vals)
+
+    checks = {
+        "DATA PREPARATION": {
+            "Data uploaded and validated":           ss.get("df_ready", False),
+            "Variable roles assigned":               bool(ss.get("assignments")),
+            "Constructs defined (>= 3 items each)":  all(len(v) >= 3 for v in constructs.values()) if constructs else False,
+            "Structural paths defined":              len(ss.get("structural_paths", [])) > 0,
+            "Measurement mode specified (reflective/formative)": bool(pls.get("construct_types")),
+        },
+        "DESCRIPTIVE STATISTICS": {
+            "Descriptive statistics computed":       ss.get("descriptive_complete", False),
+            "Sample size adequate (n >= 30)":        bool(pls) and (pls.get("n") or 0) >= 30,
+        },
+        "OUTER MODEL (MEASUREMENT)": {
+            "PLS-SEM estimated (NIPALS converged)":  bool(pls) and pls.get("converged", False),
+            "Outer loadings/weights reported":       bool(pls.get("loadings")),
+            "Indicator loadings >= .50 (reflective)": all(
+                abs(l.get("loading") or 0) >= 0.50 for l in pls.get("loadings", [])
+                if l.get("type") == "reflective"
+            ) if pls.get("loadings") else False,
+            "AVE >= .50 (convergent validity)":      _all_rel("ave", 0.50),
+            "Composite reliability (rho_c) >= .70":  _all_rel("cr", 0.70),
+            "rho_A reliability >= .70":               _all_rel("rho_a", 0.70),
+            "HTMT discriminant validity assessed":   pls.get("htmt") is not None,
+            "Fornell-Larcker criterion checked":     pls.get("fl_criterion") is not None,
+        },
+        "INNER MODEL (STRUCTURAL)": {
+            "Path coefficients estimated":           bool(pls.get("paths")),
+            "Bootstrap significance testing (>= 1000 resamples)": (pls.get("n_boot") or 0) >= 1000,
+            "VIF < 5.0 (no collinearity)":           all(
+                v <= 5.0 for outc in pls.get("vif", {}).values()
+                for v in (outc.values() if isinstance(outc, dict) else [outc])
+                if v is not None
+            ) if pls.get("vif") else False,
+            "R2 reported for endogenous constructs": bool(pls.get("r2")),
+            "Q2 predictive relevance assessed":      bool(pls.get("q2")),
+            "Model fit (SRMR) assessed":             pls.get("fit", {}).get("srmr") is not None,
+        },
+    }
+    _render_checklist_tables(checks, required_sections=list(checks.keys()))
+
+
+def _render_checklist_tables(checks, required_sections):
     total_checks = 0
     total_pass   = 0
-
     for section, section_checks in checks.items():
         st.markdown(f"**{section}**")
         rows = []
@@ -132,7 +206,7 @@ def render_full_checklist():
     elif pct >= 0.50:
         badge("warning", f"{pct:.0%} complete. Consider completing remaining analyses before reporting.")
     else:
-        badge("critical", f"Only {pct:.0%} complete. Please run CFA and SEM before exporting.")
+        badge("critical", f"Only {pct:.0%} complete. Complete the steps above before exporting.")
 
 
 def _check_loadings():
@@ -168,8 +242,25 @@ def _check_sem_fit():
 
 
 # ── APA NARRATIVE ─────────────────────────────────────────────────
-
 def generate_apa_narrative():
+    """Routes to the correct method-specific narrative generator."""
+    ss = st.session_state
+    has_pls   = bool(ss.get("pls_complete") and ss.get("pls_result") and not ss.get("pls_result", {}).get("error"))
+    has_cbsem = bool(ss.get("sem_complete") or ss.get("cfa_complete"))
+
+    if has_pls and has_cbsem:
+        return (
+            _generate_cbsem_narrative() + "\n\n" +
+            "=" * 70 + "\n" +
+            _generate_plssem_narrative()
+        )
+    elif has_pls:
+        return _generate_plssem_narrative()
+    else:
+        return _generate_cbsem_narrative()
+
+
+def _generate_cbsem_narrative():
     ss  = st.session_state
     df  = ss.get("df")
     n   = len(df) if df is not None else "N/A"
@@ -185,14 +276,15 @@ def generate_apa_narrative():
 
     lines = []
     lines.append("=" * 70)
-    lines.append("SEM STUDIO - APA RESULTS SECTION")
+    lines.append("SEM STUDIO - CB-SEM (lavaan) APA RESULTS SECTION")
     lines.append(f"Generated: {now}")
     lines.append("=" * 70)
     lines.append("")
     lines.append("SAMPLE AND METHOD")
     lines.append("-" * 40)
     lines.append(
-        f"The analysis was conducted on a sample of N = {n} participants. "
+        f"The analysis was conducted on a sample of N = {n} participants using "
+        f"covariance-based structural equation modeling (CB-SEM). "
         f"{est} estimation was used based on Mardia multivariate normality assessment. "
         f"All analyses were performed using SEM Studio (R/lavaan; Rosseel, 2012)."
     )
@@ -287,8 +379,96 @@ def generate_apa_narrative():
                 )
         lines.append("")
     lines.append("=" * 70)
-    lines.append("Note: All analyses via SEM Studio (R/lavaan).")
+    lines.append("Note: CB-SEM analyses via SEM Studio (R/lavaan).")
     lines.append("* p < .05; ** p < .01; *** p < .001; dag p < .10")
+    lines.append("=" * 70)
+    return "\n".join(lines)
+
+
+def _generate_plssem_narrative():
+    ss  = st.session_state
+    pls = ss.get("pls_result", {})
+    now = datetime.now().strftime("%B %d, %Y")
+
+    if not pls or pls.get("error"):
+        return "No PLS-SEM results available. Run PLS-SEM analysis first."
+
+    n        = pls.get("n", "N/A")
+    n_boot   = pls.get("n_boot", 1000)
+    paths    = pls.get("paths", [])
+    rel      = pls.get("reliability", {})
+    r2_list  = pls.get("r2", [])
+    q2_dict  = pls.get("q2", {})
+    fit      = pls.get("fit", {})
+    srmr     = _safe_float(fit.get("srmr"))
+    algorithm = pls.get("algorithm", "NIPALS")
+
+    lines = []
+    lines.append("=" * 70)
+    lines.append("SEM STUDIO - PLS-SEM APA RESULTS SECTION")
+    lines.append(f"Generated: {now}")
+    lines.append("=" * 70)
+    lines.append("")
+    lines.append("SAMPLE AND METHOD")
+    lines.append("-" * 40)
+    lines.append(
+        f"The analysis was conducted on a sample of N = {n} participants using "
+        f"partial least squares structural equation modeling (PLS-SEM), estimated via "
+        f"the {algorithm} algorithm (Wold, 1982; Lohmoller, 1989). "
+        f"Significance was assessed using {n_boot:,}-resample bootstrapping "
+        f"(Hair et al., 2022). All analyses were performed using SEM Studio."
+    )
+    lines.append("")
+    lines.append("MEASUREMENT MODEL (OUTER MODEL)")
+    lines.append("-" * 40)
+    if rel:
+        all_ok = all(m.get("cr_ok") and m.get("ave_ok") for m in rel.values())
+        lines.append(
+            f"Reliability and convergent validity were assessed for {len(rel)} constructs. "
+            f"{'All constructs demonstrated adequate reliability (rho_c >= .70) and convergent validity (AVE >= .50).' if all_ok else 'Some constructs did not fully meet reliability or validity thresholds; see table below.'}"
+        )
+        for cname, m in rel.items():
+            parts = []
+            if m.get("alpha") is not None: parts.append(f"alpha = {m['alpha']:.3f}")
+            if m.get("cr")    is not None: parts.append(f"rho_c = {m['cr']:.3f}")
+            if m.get("ave")   is not None: parts.append(f"AVE = {m['ave']:.3f}")
+            if parts: lines.append(f"  {cname}: {', '.join(parts)}")
+    if srmr is not None:
+        lines.append("")
+        lines.append(f"Overall model fit: SRMR = {srmr:.3f} ({'acceptable' if srmr < 0.08 else 'above the .08 threshold'}; Henseler et al., 2015).")
+    lines.append("")
+    lines.append("STRUCTURAL MODEL (INNER MODEL)")
+    lines.append("-" * 40)
+    if paths:
+        lines.append("Structural path results (bootstrapped):")
+        for i, p in enumerate(paths, 1):
+            beta  = _safe_float(p.get("beta"))
+            t_val = _safe_float(p.get("t_stat"))
+            p_val = _safe_float(p.get("p_value"))
+            if beta is None: continue
+            sig = "significant" if (p_val is not None and p_val < 0.05) else "not significant"
+            lines.append(
+                f"  H{i}: {p.get('predictor','?')} --> {p.get('outcome','?')}: "
+                f"beta = {beta:.3f}{_stars(p_val)}, t = {_fmt(t_val,3)}, p = {_fmt(p_val,4)} -- {sig}."
+            )
+    if r2_list:
+        lines.append("")
+        lines.append("Explained variance:")
+        for r in r2_list:
+            r2v = _safe_float(r.get("r2"))
+            if r2v is not None:
+                lines.append(f"  {r.get('construct','?')}: R2 = {r2v:.3f} ({r.get('level','')})")
+    if q2_dict:
+        lines.append("")
+        lines.append("Predictive relevance (Q2, via cross-validated blindfolding proxy):")
+        for cname, qv in q2_dict.items():
+            q2val = _safe_float(qv.get("q2") if isinstance(qv, dict) else qv)
+            if q2val is not None:
+                lines.append(f"  {cname}: Q2 = {q2val:.3f} ({'predictive relevance present' if q2val > 0 else 'no predictive relevance'})")
+    lines.append("")
+    lines.append("=" * 70)
+    lines.append("Note: PLS-SEM analyses via SEM Studio (NIPALS algorithm).")
+    lines.append("* p < .05; ** p < .01; *** p < .001")
     lines.append("=" * 70)
     return "\n".join(lines)
 
