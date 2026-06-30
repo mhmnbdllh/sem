@@ -100,17 +100,25 @@ def render_bootstrap_settings():
     st.subheader("Step 2: Bootstrap Settings")
     st.markdown(
         "PLS-SEM uses bootstrapping for significance testing. "
-        "More resamples = more accurate p-values but longer computation time."
+        "Each resample re-runs the full NIPALS algorithm, so more resamples "
+        "means substantially longer computation time."
     )
     n_boot = st.select_slider(
         "Number of bootstrap resamples:",
-        options=[500, 1000, 2000, 5000],
-        value=st.session_state.get("pls_n_boot", 1000),
+        options=[200, 500, 1000, 2000],
+        value=st.session_state.get("pls_n_boot", 500),
         key="pls_n_boot",
-        help="Hair et al. (2022) recommend minimum 1000. 5000 for publication."
+        help="Hair et al. (2022) recommend minimum 1000 for final reporting. "
+             "Use fewer resamples (200-500) for quick exploratory checks."
     )
+    # Each bootstrap resample re-runs full NIPALS (up to 100 iterations) —
+    # this is much heavier than a single OLS regression, so the time estimate
+    # must reflect that, not a flat resamples-per-minute rate.
+    est_min_low  = max(1, round(n_boot / 300))
+    est_min_high = max(1, round(n_boot / 120))
     st.caption(
-        f"Estimated time: {n_boot // 500} – {n_boot // 250} minutes on Streamlit Cloud."
+        f"Estimated time: {est_min_low}–{est_min_high} minutes on Streamlit Cloud "
+        f"(each resample re-estimates the full NIPALS model)."
     )
     return n_boot
 
@@ -172,6 +180,13 @@ def render_outer_model(result):
 # ─────────────────────────────────────────────────────────────────────────────
 def render_reliability(result):
     st.subheader("Step 4: Reliability and Validity")
+    with st.expander("❓ What do these metrics mean?", expanded=False):
+        st.markdown("""
+- **α (Cronbach's alpha):** How consistently the items in a construct measure the same thing. Older, simpler measure.
+- **ρc (Composite Reliability):** Modern replacement for alpha — accounts for differing item loadings. Preferred in PLS-SEM.
+- **ρA (Dijkstra-Henseler reliability):** A consistency-corrected reliability estimate designed specifically for PLS weight estimates.
+- **AVE (Average Variance Extracted):** How much of the variance in the items is explained by the construct itself, versus measurement error. AVE ≥ .50 means the construct explains more than half the variance in its items — i.e., convergent validity is supported.
+        """)
 
     rel = result.get("reliability", {})
     if not rel:
